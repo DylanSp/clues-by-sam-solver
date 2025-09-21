@@ -1,17 +1,23 @@
-from z3 import Int, Solver, sat, Or
+from z3 import Int, Solver, sat, Or, And, Not, Bools
+
+from fixed_point import run_fixed_point_example
 
 
 def main():
-    x = Int('x')
-    y = Int('y')
-    s = Solver()
-    s.add(x >= 0)
-    s.add(y >= 0)
-    s.add(x + y == 3)
+    run_fixed_point_example()
+    return
 
-    while s.check() == sat:
-        print(s.model())
-        s.add(Or(x != s.model()[x], y != s.model()[y]))
+    a, b = Bools("a b")
+
+    s = Solver()
+
+    s.add(Or(And(a, Not(b)), And(Not(a), b)))
+    s.check()
+    print(s.model())
+
+    # while s.check() == sat:
+    #     print(s.model())
+    #     s.add(Or(a != s.model()[a], b != s.model()[b]))
 
 
 if __name__ == "__main__":

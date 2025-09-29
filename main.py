@@ -30,10 +30,17 @@ class Puzzle:
     suspects: List[Suspect]
 
     def row(self, row_num) -> Set[Suspect]:
-        pass
+        """Get suspects in 1-indexed row"""
+
+        start_idx = (row_num - 1) * NUM_COLS
+        end_idx = start_idx + NUM_COLS
+        return (set(self.suspects[start_idx:end_idx]))
 
     def column(self, column_num) -> Set[Suspect]:
-        pass
+        """Get suspects in 1-indexed column"""
+
+        # slicing syntax; starting with (column_num - 1), print every NUM_COLS'th element
+        return (set(self.suspects[(column_num - 1)::NUM_COLS]))
 
 
 def initialize_suspect(json_data: dict) -> Suspect:
@@ -102,7 +109,32 @@ input_data = '[{"name":"Barb","profession":"judge"},{"name":"Chris","profession"
 
 
 def main():
-    initialize_puzzle(input_data)
+    puzzle = initialize_puzzle(input_data)
+
+    print("Column 1:")
+    col1 = puzzle.column(1)
+    for suspect in col1:
+        print(suspect.name)
+
+    print()
+
+    print("Column 2:")
+    col2 = puzzle.column(2)
+    for suspect in col2:
+        print(suspect.name)
+
+    print()
+
+    print("Row 1:")
+    row1 = puzzle.row(1)
+    for suspect in row1:
+        print(suspect.name)
+
+    print()
+
+    print("Row 3:")
+    for suspect in puzzle.row(3):
+        print(suspect.name)
     return
 
     run_fixed_point_example()

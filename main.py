@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import json
 from typing import List, Set
-from z3 import Int, Solver, sat, Or, And, Not, Bools, BoolRef, BoolVector
+from z3 import Int, Solver, sat, Or, And, Not, Bools, BoolRef, BoolVector, AtLeast, AtMost
 
 from fixed_point import run_fixed_point_example
 
@@ -44,12 +44,15 @@ class PuzzleData:
 
 
 class Puzzle:
-    verdicts: List[BoolRef]
-    underlying_puzzle: PuzzleData
+    verdicts: List[BoolRef]  # true iff suspect is innocent
+    solver: Solver
+
+    underlying_puzzle: PuzzleData  # can get out of sync with self.verdicts
 
     def __init__(self, puzzle_data: PuzzleData) -> None:
         self.underlying_puzzle = puzzle_data
         self.verdicts = BoolVector('s', len(puzzle_data.suspects))
+        self.solver = Solver()
 
 
 def initialize_suspect(json_data: dict) -> Suspect:
@@ -117,7 +120,39 @@ def print_grid(grid: List[List[Suspect]]):
 input_data = '[{"name":"Barb","profession":"judge"},{"name":"Chris","profession":"cook"},{"name":"Debra","profession":"painter"},{"name":"Evie","profession":"painter"},{"name":"Freya","profession":"judge"},{"name":"Gary","profession":"painter"},{"name":"Hal","profession":"guard"},{"name":"Isaac","profession":"guard"},{"name":"Jerry","profession":"singer"},{"name":"Karen","profession":"coder"},{"name":"Logan","profession":"judge"},{"name":"Mark","profession":"singer"},{"name":"Noah","profession":"cook"},{"name":"Olivia","profession":"teacher"},{"name":"Pam","profession":"teacher"},{"name":"Ronald","profession":"guard"},{"name":"Thor","profession":"coder"},{"name":"Vicky","profession":"sleuth"},{"name":"Xena","profession":"sleuth"},{"name":"Zoe","profession":"sleuth"}]'
 
 
+def cardinality_examples():
+    s1 = Solver()
+    a, b, c = Bools("a b c")
+
+    # exactly two of a,b,c, are true
+    s1.add(AtLeast(a, b, c, 2))
+    s1.add(AtMost(a, b, c, 2))
+
+    # a and b are true
+    s1.add(a)
+    s1.add(b)
+
+    # should be sat, with c false
+    print(s1.check())
+    print(s1.model())
+
+    s2 = Solver()
+    d, e = Bools("d e")
+
+    # neither d nor e is true
+    s2.add(AtMost(d, e, 0))
+
+    # d is true
+    s2.add(d)
+
+    # should be unsat
+    print(s2.check())
+
+
 def main():
+    cardinality_examples()
+    return
+
     puzzle = initialize_puzzle(input_data)
 
     print("Column 1:")

@@ -4,8 +4,6 @@ import json
 from typing import List, Set, Tuple
 from z3 import Int, Solver, sat, Or, And, Not, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat
 
-from fixed_point import run_fixed_point_example
-
 NUM_ROWS = 5
 NUM_COLS = 4
 
@@ -227,35 +225,6 @@ def print_grid(grid: List[List[Suspect]]):
 input_data = '[{"name":"Alex","profession":"cook"},{"name":"Bonnie","profession":"painter"},{"name":"Chris","profession":"cook"},{"name":"Ellie","profession":"cop"},{"name":"Frank","profession":"farmer"},{"name":"Helen","profession":"cook"},{"name":"Isaac","profession":"guard"},{"name":"Julie","profession":"clerk"},{"name":"Keith","profession":"farmer"},{"name":"Megan","profession":"painter"},{"name":"Nancy","profession":"guard"},{"name":"Olof","profession":"clerk"},{"name":"Paula","profession":"cop"},{"name":"Ryan","profession":"sleuth"},{"name":"Sofia","profession":"guard"},{"name":"Terry","profession":"sleuth"},{"name":"Vicky","profession":"farmer"},{"name":"Wally","profession":"mech"},{"name":"Xavi","profession":"mech"},{"name":"Zara","profession":"mech"}]'
 
 
-def cardinality_examples():
-    s1 = Solver()
-    a, b, c = Bools("a b c")
-
-    # exactly two of a,b,c, are true
-    s1.add(AtLeast(a, b, c, 2))
-    s1.add(AtMost(a, b, c, 2))
-
-    # a and b are true
-    s1.add(a)
-    s1.add(b)
-
-    # should be sat, with c false
-    print(s1.check())
-    print(s1.model())
-
-    s2 = Solver()
-    d, e = Bools("d e")
-
-    # neither d nor e is true
-    s2.add(AtMost(d, e, 0))
-
-    # d is true
-    s2.add(d)
-
-    # should be unsat
-    print(s2.check())
-
-
 def main():
     puzzle_data = initialize_puzzle_data(input_data)
     puzzle = Puzzle(puzzle_data)
@@ -263,7 +232,7 @@ def main():
     # initial uncovered suspect
     puzzle.set_single_verdict("Frank", True)
 
-    # initial clue - "Exactly 1 innocent in column A is neighboring Megan"
+    # first clue, from Frank - "Exactly 1 innocent in column A is neighboring Megan"
     column_a_suspects = puzzle_data.column_by_name("A")
     megan_neighbors = puzzle_data.find_suspect("Megan").neighbors
     relevant_suspects = column_a_suspects.intersection(megan_neighbors)
@@ -275,26 +244,7 @@ def main():
     puzzle.solver.add(AtLeast(*relevant_suspect_refs, 1))
     puzzle.solver.add(AtMost(*relevant_suspect_refs, 1))
 
-    print(puzzle.solver.check())
-
     puzzle.deduce_all()
-
-    return
-
-    run_fixed_point_example()
-    return
-
-    a, b = Bools("a b")
-
-    s = Solver()
-
-    s.add(Or(And(a, Not(b)), And(Not(a), b)))
-    s.check()
-    print(s.model())
-
-    # while s.check() == sat:
-    #     print(s.model())
-    #     s.add(Or(a != s.model()[a], b != s.model()[b]))
 
 
 if __name__ == "__main__":

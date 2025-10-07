@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 import json
-from typing import List, Set
+from typing import List, Set, Tuple
 from z3 import Int, Solver, sat, Or, And, Not, Bools, BoolRef, BoolVector, AtLeast, AtMost
 
 from fixed_point import run_fixed_point_example
@@ -42,9 +42,26 @@ class PuzzleData:
         # slicing syntax; starting with (column_num - 1), print every NUM_COLS'th element
         return (set(self.suspects[(column_num - 1)::NUM_COLS]))
 
+    def column_by_name(self, column_name) -> Set[Suspect]:
+        """Get suspects in column by column name (A, B, C, D)"""
+        column_nums = {
+            "A": 1,
+            "B": 2,
+            "C": 3,
+            "D": 4
+        }
+        return self.column(column_nums[column_name])
+
+    def find_suspect(self, suspect_name: str) -> Suspect:
+        for suspect in self.suspects:
+            if suspect.name == suspect_name:
+                return suspect
+        raise ValueError(f"suspect {suspect_name} not found")
+
 
 class Puzzle:
     verdicts: List[BoolRef]  # true iff suspect is innocent
+    solved_verdicts: Set[int]  # indexes of verdicts with known solutions
     solver: Solver
 
     underlying_puzzle: PuzzleData  # can get out of sync with self.verdicts
@@ -52,7 +69,35 @@ class Puzzle:
     def __init__(self, puzzle_data: PuzzleData) -> None:
         self.underlying_puzzle = puzzle_data
         self.verdicts = BoolVector('s', len(puzzle_data.suspects))
+        self.solved_verdicts = set()
         self.solver = Solver()
+
+    def find_suspect_ref(self, suspect_name: str) -> Tuple[BoolRef, int]:
+        for idx, suspect in enumerate(self.underlying_puzzle.suspects):
+            if suspect.name == suspect_name:
+                return self.verdicts[idx], idx
+        raise ValueError(f"suspect {suspect_name} not found")
+
+    def find_suspect_set_refs(self, suspects: Set[Suspect]) -> Set[BoolRef]:
+        refs: Set[BoolRef] = set()
+        for idx, suspect in enumerate(self.underlying_puzzle.suspects):
+            if suspect in suspects:
+                refs.add(self.verdicts[idx])
+        return refs
+
+    def set_single_verdict(self, suspect_name: str, is_innocent: bool):
+        ref, idx = self.find_suspect_ref(suspect_name)
+        self.solved_verdicts.add(idx)
+
+        # keep underlying puzzle data in sync
+        suspect = self.underlying_puzzle.find_suspect(suspect_name)
+
+        if is_innocent:
+            self.solver.add(ref)
+            suspect.verdict = Verdict.INNOCENT
+        else:
+            self.solver.add(Not(ref))
+            suspect.verdict = Verdict.CRIMINAL
 
 
 def initialize_suspect(json_data: dict) -> Suspect:
@@ -64,7 +109,7 @@ def initialize_suspect(json_data: dict) -> Suspect:
     )
 
 
-def initialize_puzzle(json_string: str) -> PuzzleData:
+def initialize_puzzle_data(json_string: str) -> PuzzleData:
     puzzle = PuzzleData(suspects=[])
 
     # Used as initial element of grid
@@ -104,7 +149,7 @@ def initialize_puzzle(json_string: str) -> PuzzleData:
                     neighbor = grid[neighbor_row][neighbor_col]
                     suspect.neighbors.add(neighbor)
 
-    print_grid(grid)
+    # print_grid(grid)
 
     return puzzle
 
@@ -117,7 +162,9 @@ def print_grid(grid: List[List[Suspect]]):
 
 
 # Get this from browser console
-input_data = '[{"name":"Barb","profession":"judge"},{"name":"Chris","profession":"cook"},{"name":"Debra","profession":"painter"},{"name":"Evie","profession":"painter"},{"name":"Freya","profession":"judge"},{"name":"Gary","profession":"painter"},{"name":"Hal","profession":"guard"},{"name":"Isaac","profession":"guard"},{"name":"Jerry","profession":"singer"},{"name":"Karen","profession":"coder"},{"name":"Logan","profession":"judge"},{"name":"Mark","profession":"singer"},{"name":"Noah","profession":"cook"},{"name":"Olivia","profession":"teacher"},{"name":"Pam","profession":"teacher"},{"name":"Ronald","profession":"guard"},{"name":"Thor","profession":"coder"},{"name":"Vicky","profession":"sleuth"},{"name":"Xena","profession":"sleuth"},{"name":"Zoe","profession":"sleuth"}]'
+
+# data from Puzzle Pack #1, puzzle 1
+input_data = '[{"name":"Alex","profession":"cook"},{"name":"Bonnie","profession":"painter"},{"name":"Chris","profession":"cook"},{"name":"Ellie","profession":"cop"},{"name":"Frank","profession":"farmer"},{"name":"Helen","profession":"cook"},{"name":"Isaac","profession":"guard"},{"name":"Julie","profession":"clerk"},{"name":"Keith","profession":"farmer"},{"name":"Megan","profession":"painter"},{"name":"Nancy","profession":"guard"},{"name":"Olof","profession":"clerk"},{"name":"Paula","profession":"cop"},{"name":"Ryan","profession":"sleuth"},{"name":"Sofia","profession":"guard"},{"name":"Terry","profession":"sleuth"},{"name":"Vicky","profession":"farmer"},{"name":"Wally","profession":"mech"},{"name":"Xavi","profession":"mech"},{"name":"Zara","profession":"mech"}]'
 
 
 def cardinality_examples():
@@ -150,35 +197,22 @@ def cardinality_examples():
 
 
 def main():
-    cardinality_examples()
-    return
+    puzzle_data = initialize_puzzle_data(input_data)
+    puzzle = Puzzle(puzzle_data)
 
-    puzzle = initialize_puzzle(input_data)
+    # initial uncovered suspect
+    puzzle.set_single_verdict("Frank", True)
 
-    print("Column 1:")
-    col1 = puzzle.column(1)
-    for suspect in col1:
-        print(suspect.name)
+    # initial clue - "Exactly 1 innocent in column A is neighboring Megan"
+    column_a_suspects = puzzle_data.column_by_name("A")
+    megan_neighbors = puzzle_data.find_suspect("Megan").neighbors
+    relevant_suspects = column_a_suspects.intersection(megan_neighbors)
+    relevant_suspect_refs = puzzle.find_suspect_set_refs(relevant_suspects)
+    puzzle.solver.add(AtLeast(*relevant_suspect_refs, 1))
+    puzzle.solver.add(AtMost(*relevant_suspect_refs, 1))
 
-    print()
+    print(puzzle.solver.check())
 
-    print("Column 2:")
-    col2 = puzzle.column(2)
-    for suspect in col2:
-        print(suspect.name)
-
-    print()
-
-    print("Row 1:")
-    row1 = puzzle.row(1)
-    for suspect in row1:
-        print(suspect.name)
-
-    print()
-
-    print("Row 3:")
-    for suspect in puzzle.row(3):
-        print(suspect.name)
     return
 
     run_fixed_point_example()

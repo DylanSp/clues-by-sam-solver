@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import json
 from typing import List, Set
-from z3 import Int, Solver, sat, Or, And, Not, Bools
+from z3 import Int, Solver, sat, Or, And, Not, Bools, BoolRef, BoolVector
 
 from fixed_point import run_fixed_point_example
 
@@ -26,7 +26,7 @@ class Suspect:
 
 
 @dataclass
-class Puzzle:
+class PuzzleData:
     suspects: List[Suspect]
 
     def row(self, row_num) -> Set[Suspect]:
@@ -43,6 +43,15 @@ class Puzzle:
         return (set(self.suspects[(column_num - 1)::NUM_COLS]))
 
 
+class Puzzle:
+    verdicts: List[BoolRef]
+    underlying_puzzle: PuzzleData
+
+    def __init__(self, puzzle_data: PuzzleData) -> None:
+        self.underlying_puzzle = puzzle_data
+        self.verdicts = BoolVector('s', len(puzzle_data.suspects))
+
+
 def initialize_suspect(json_data: dict) -> Suspect:
     return Suspect(
         name=json_data["name"],
@@ -52,8 +61,8 @@ def initialize_suspect(json_data: dict) -> Suspect:
     )
 
 
-def initialize_puzzle(json_string: str) -> Puzzle:
-    puzzle = Puzzle(suspects=[])
+def initialize_puzzle(json_string: str) -> PuzzleData:
+    puzzle = PuzzleData(suspects=[])
 
     # Used as initial element of grid
     dummy_suspect = Suspect(

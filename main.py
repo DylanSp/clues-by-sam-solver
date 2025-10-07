@@ -1,8 +1,8 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 import json
 from typing import List, Set, Tuple
-from z3 import Int, Solver, sat, Or, And, Not, Bools, BoolRef, BoolVector, AtLeast, AtMost
+from z3 import Int, Solver, sat, Or, And, Not, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat
 
 from fixed_point import run_fixed_point_example
 
@@ -16,13 +16,16 @@ class Verdict(Enum):
     UNKNOWN = 3
 
 
-@dataclass(unsafe_hash=True)
+@dataclass
 class Suspect:
     verdict: Verdict
     name: str
     profession: str
-    # (compare=False) so it isn't used in equality comparisons/hashing; needed because Sets aren't hashable
-    neighbors: Set['Suspect'] = field(compare=False)
+    neighbors: Set['Suspect']
+
+    # Name (and profession) are immutable; verdict is mutable, Sets aren't hashable, so compare only based on name
+    def __hash__(self) -> int:
+        return hash(self.name)
 
 
 @dataclass
@@ -99,6 +102,65 @@ class Puzzle:
             self.solver.add(Not(ref))
             suspect.verdict = Verdict.CRIMINAL
 
+    # Try to deduce additional verdicts; returns true if a suspect's status was deduced
+    def deduce(self) -> bool:
+        all_verdict_indexes = set(range(0, len(self.verdicts)))
+        unknown_verdict_indexes = all_verdict_indexes.difference(
+            self.solved_verdicts)
+
+        for idx in unknown_verdict_indexes:
+            assert self.solver.check() == sat, "Solver is not currently satisfiable!"
+            # print(f'Checking suspect w/ idx {idx}')
+
+            # check if suspect being innocent creates contradiction
+            self.solver.push()
+            self.solver.add(self.verdicts[idx])
+            if self.solver.check() == unsat:
+                # suspect must be criminal
+                # pop the supposition that suspect was innocent, set suspect to be criminal
+                self.solver.pop()
+                self.solver.add(Not(self.verdicts[idx]))
+
+                self.solved_verdicts.add(idx)
+                print(f'suspect #{idx} is criminal')
+                # TODO - update underlying suspect data
+                return True
+            else:
+                # reset to previous backtracking point
+                self.solver.pop()
+
+            # check if suspect being criminal creates contradiction
+            self.solver.push()
+            self.solver.add(Not(self.verdicts[idx]))
+            if self.solver.check() == unsat:
+                # suspect must be innocent
+                # pop the supposition that suspect was criminal, set suspect to be innocent
+                self.solver.pop()
+                self.solver.add(self.verdicts[idx])
+
+                self.solved_verdicts.add(idx)
+                print(f'suspect #{idx} is innocent')
+                # TODO - update underlying suspect data
+                return True
+            else:
+                # reset to previous backtracking point
+                self.solver.pop()
+
+            # print(f'No verdict deduced for suspect {idx}')
+
+        return False
+
+    # Deduce as many verdicts as can be found with current clues
+    # Returns true if some progress was made (regardless of how much)
+    def deduce_all(self) -> bool:
+        can_make_progress = True
+        progress_made = False
+        while can_make_progress:
+            can_make_progress = self.deduce()
+            if can_make_progress:
+                progress_made = True
+        return progress_made
+
 
 def initialize_suspect(json_data: dict) -> Suspect:
     return Suspect(
@@ -138,7 +200,7 @@ def initialize_puzzle_data(json_string: str) -> PuzzleData:
             suspect = grid[row][col]
             for dx in range(-1, 2):
                 for dy in range(-1, 2):
-                    if dx == 0 and dx == 0:
+                    if dx == 0 and dy == 0:
                         continue
                     neighbor_row = row + dx
                     neighbor_col = col + dy
@@ -148,9 +210,6 @@ def initialize_puzzle_data(json_string: str) -> PuzzleData:
                         continue
                     neighbor = grid[neighbor_row][neighbor_col]
                     suspect.neighbors.add(neighbor)
-
-    # print_grid(grid)
-
     return puzzle
 
 
@@ -207,11 +266,17 @@ def main():
     column_a_suspects = puzzle_data.column_by_name("A")
     megan_neighbors = puzzle_data.find_suspect("Megan").neighbors
     relevant_suspects = column_a_suspects.intersection(megan_neighbors)
+
+    # for suspect in relevant_suspects:
+    #     print(suspect.name)
+
     relevant_suspect_refs = puzzle.find_suspect_set_refs(relevant_suspects)
     puzzle.solver.add(AtLeast(*relevant_suspect_refs, 1))
     puzzle.solver.add(AtMost(*relevant_suspect_refs, 1))
 
     print(puzzle.solver.check())
+
+    puzzle.deduce_all()
 
     return
 

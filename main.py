@@ -246,6 +246,19 @@ def main():
 
     puzzle.deduce_all()
 
+    # second clue, from Keith - "There's an odd number of criminals to the left of Sofia"
+
+    """
+    TODO - rather than using % 2 == 1, hardcode counts: 
+    Or(
+        And(AtLeast(,1),AtMost(,1)),
+        And(AtLeast(,3),AtMost(,3)),
+        And(AtLeast(,5),AtMost(,5))
+    )
+
+    (for even - same, but with 0, 2, 4)
+    """
+
 
 if __name__ == "__main__":
     main()

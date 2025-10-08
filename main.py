@@ -35,7 +35,7 @@ class Suspect:
     row: int
     column: Column
     neighbors: Set['Suspect']
-    is_innocent: BoolRef  # Z3 expression
+    is_innocent: BoolRef  # Z3 expression - true iff suspect is innocent
 
     # Names are unique and immutable, so can be used for equality testing; can't use default hash because Sets aren't hashable
     def __hash__(self) -> int:
@@ -240,16 +240,19 @@ def main():
     puzzle.solve_many()
     print()
 
-    """
-    TODO - rather than using % 2 == 1, hardcode counts: 
-    Or(
-        And(AtLeast(,1),AtMost(,1)),
-        And(AtLeast(,3),AtMost(,3)),
-        And(AtLeast(,5),AtMost(,5))
-    )
+    # third clue, from Ryan - "There is only one innocent above Keith"
+    clue3_relevant = puzzle.get_suspects_relative_to_other_suspect(
+        "Keith", Direction.ABOVE)
+    print("Relevant suspects:")
+    for suspect in clue3_relevant:
+        print(suspect.name)
+    print()
 
-    (for even - same, but with 0, 2, 4)
-    """
+    clue3_relevant_refs = [suspect.is_innocent for suspect in clue3_relevant]
+    puzzle.solver.add(AtLeast(*clue3_relevant_refs, 1))
+    puzzle.solver.add(AtMost(*clue3_relevant_refs, 1))
+    puzzle.solve_many()
+    print()
 
 
 if __name__ == "__main__":

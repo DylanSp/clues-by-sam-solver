@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 from typing import List, Set, Tuple
-from z3 import Int, Solver, sat, Or, And, Not, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat
+from z3 import Int, Solver, sat, Or, And, Not, Bool, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat
 
 NUM_ROWS = 5
 NUM_COLS = 4
@@ -14,16 +14,90 @@ class Verdict(Enum):
     UNKNOWN = 3
 
 
+class Column(Enum):
+    A = 0
+    B = 1
+    C = 2
+    D = 3
+
+
 @dataclass
 class Suspect:
-    verdict: Verdict
     name: str
     profession: str
+    row: int
+    column: Column
     neighbors: Set['Suspect']
+    verdict: BoolRef  # Z3 expression
 
-    # Name (and profession) are immutable; verdict is mutable, Sets aren't hashable, so compare only based on name
+    # Names are unique and immutable, so can be used for equality testing; can't use default hash because Sets aren't hashable
     def __hash__(self) -> int:
         return hash(self.name)
+
+
+class Puzzle2:
+    suspects: dict[str, Suspect]  # suspects by name
+    solver: Solver
+    # suspects whose verdict hasn't yet been determined
+    unsolved_suspects: Set[Suspect]
+
+    def __init__(self, json_string: str) -> None:
+        self.solver = Solver()
+
+        data: List[dict] = json.loads(json_string)
+
+        # set up 2D grid to be used when setting up suspects' neighbors
+
+        # Used as initial element of grid
+        dummy_suspect = Suspect(
+            name="dummy",
+            profession="none",
+            neighbors=set(),
+            verdict=Bool("dummy"),
+            row=1,
+            column=Column.A
+        )
+
+        grid = [[dummy_suspect for col in range(
+            NUM_COLS)] for row in range(NUM_ROWS)]
+
+        idx = 0
+        for suspect_data in data:
+            suspect = Suspect(
+                name=suspect_data["name"],
+                profession=suspect_data["profession"],
+                neighbors=set(),
+                verdict=Bool(suspect_data["name"]),
+                row=(idx // NUM_COLS) + 1,  # convert to 1-based index
+                column=Column(idx % NUM_COLS),
+            )
+            self.suspects[suspect.name] = suspect
+            self.unsolved_suspects.add(suspect)
+
+            idx += 1
+
+        # set up suspects' neighbors
+        for row in range(NUM_ROWS):
+            for col in range(NUM_COLS):
+                suspect = grid[row][col]
+                for dx in range(-1, 2):
+                    for dy in range(-1, 2):
+                        if dx == 0 and dy == 0:
+                            continue
+                        neighbor_row = row + dx
+                        neighbor_col = col + dy
+                        if neighbor_row < 0 or neighbor_row >= NUM_ROWS:
+                            continue
+                        if neighbor_col < 0 or neighbor_col >= NUM_COLS:
+                            continue
+                        neighbor = grid[neighbor_row][neighbor_col]
+                        suspect.neighbors.add(neighbor)
+
+    def row(self, row_num: int) -> Set[Suspect]:
+        return set([suspect for suspect in self.suspects.values() if suspect.row == row_num])
+
+    def column(self, column_name: Column) -> Set[Suspect]:
+        return set([suspect for suspect in self.suspects.values() if suspect.column == column_name])
 
 
 @dataclass

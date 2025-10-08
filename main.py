@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 import json
 from typing import List, Set, Tuple
 from z3 import Int, Solver, sat, Or, And, Not, Bool, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat
@@ -14,11 +14,18 @@ class Verdict(Enum):
     UNKNOWN = 3
 
 
-class Column(Enum):
+class Column(IntEnum):
     A = 0
     B = 1
     C = 2
     D = 3
+
+
+class Direction(Enum):
+    ABOVE = 1
+    BELOW = 2
+    LEFT = 3
+    RIGHT = 4
 
 
 @dataclass
@@ -102,6 +109,18 @@ class Puzzle:
 
     def column(self, column_name: Column) -> Set[Suspect]:
         return set([suspect for suspect in self.suspects.values() if suspect.column == column_name])
+
+    def get_suspects_relative_to_other_suspect(self, root_suspect_name: str, direction: Direction) -> Set[Suspect]:
+        root_suspect = self.suspects[root_suspect_name]
+        match direction:
+            case Direction.ABOVE:
+                return set([suspect for suspect in self.suspects.values() if suspect.column == root_suspect.column and suspect.row < root_suspect.row])
+            case Direction.BELOW:
+                return set([suspect for suspect in self.suspects.values() if suspect.column == root_suspect.column and suspect.row > root_suspect.row])
+            case Direction.LEFT:
+                return set([suspect for suspect in self.suspects.values() if suspect.row == root_suspect.row and suspect.column < root_suspect.column])
+            case Direction.RIGHT:
+                return set([suspect for suspect in self.suspects.values() if suspect.row == root_suspect.row and suspect.column > root_suspect.column])
 
     def set_single_verdict(self, suspect_name: str, is_innocent: bool):
         suspect = self.suspects[suspect_name]
@@ -200,8 +219,26 @@ def main():
     puzzle.solver.add(AtMost(*relevant_suspect_refs, 1))
 
     puzzle.solve_many()
+    print()
 
     # second clue, from Keith - "There's an odd number of criminals to the left of Sofia"
+    clue2_relevant = puzzle.get_suspects_relative_to_other_suspect(
+        "Sofia", Direction.LEFT)
+    print("Relevant suspects:")
+    for suspect in clue2_relevant:
+        print(suspect.name)
+    print()
+
+    clue2_relevant_refs = [suspect.is_innocent for suspect in clue2_relevant]
+
+    puzzle.solver.add(Or(
+        And(AtLeast(*clue2_relevant_refs, 1), AtMost(*clue2_relevant_refs, 1)),
+        And(AtLeast(*clue2_relevant_refs, 3), AtMost(*clue2_relevant_refs, 3)),
+        And(AtLeast(*clue2_relevant_refs, 5), AtMost(*clue2_relevant_refs, 5))
+    ))
+
+    puzzle.solve_many()
+    print()
 
     """
     TODO - rather than using % 2 == 1, hardcode counts: 

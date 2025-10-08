@@ -254,6 +254,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # fourth clue, from Alex - "Both criminals below me are connected"
+
 
 if __name__ == "__main__":
     main()

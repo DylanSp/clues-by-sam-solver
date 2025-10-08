@@ -28,14 +28,14 @@ class Suspect:
     row: int
     column: Column
     neighbors: Set['Suspect']
-    verdict: BoolRef  # Z3 expression
+    is_innocent: BoolRef  # Z3 expression
 
     # Names are unique and immutable, so can be used for equality testing; can't use default hash because Sets aren't hashable
     def __hash__(self) -> int:
         return hash(self.name)
 
 
-class Puzzle2:
+class Puzzle:
     suspects: dict[str, Suspect]  # suspects by name
     solver: Solver
     # suspects whose verdict hasn't yet been determined
@@ -43,6 +43,8 @@ class Puzzle2:
 
     def __init__(self, json_string: str) -> None:
         self.solver = Solver()
+        self.suspects = {}
+        self.unsolved_suspects = set()
 
         data: List[dict] = json.loads(json_string)
 
@@ -53,11 +55,10 @@ class Puzzle2:
             name="dummy",
             profession="none",
             neighbors=set(),
-            verdict=Bool("dummy"),
+            is_innocent=Bool("dummy"),
             row=1,
             column=Column.A
         )
-
         grid = [[dummy_suspect for col in range(
             NUM_COLS)] for row in range(NUM_ROWS)]
 
@@ -67,12 +68,15 @@ class Puzzle2:
                 name=suspect_data["name"],
                 profession=suspect_data["profession"],
                 neighbors=set(),
-                verdict=Bool(suspect_data["name"]),
+                is_innocent=Bool(suspect_data["name"]),
                 row=(idx // NUM_COLS) + 1,  # convert to 1-based index
                 column=Column(idx % NUM_COLS),
             )
             self.suspects[suspect.name] = suspect
             self.unsolved_suspects.add(suspect)
+
+            # add to grid to use when setting up neighbors later
+            grid[idx // NUM_COLS][idx % NUM_COLS] = suspect
 
             idx += 1
 
@@ -99,197 +103,62 @@ class Puzzle2:
     def column(self, column_name: Column) -> Set[Suspect]:
         return set([suspect for suspect in self.suspects.values() if suspect.column == column_name])
 
-
-@dataclass
-class PuzzleData:
-    suspects: List[Suspect]
-
-    def row(self, row_num) -> Set[Suspect]:
-        """Get suspects in 1-indexed row"""
-
-        start_idx = (row_num - 1) * NUM_COLS
-        end_idx = start_idx + NUM_COLS
-        return (set(self.suspects[start_idx:end_idx]))
-
-    def column(self, column_num) -> Set[Suspect]:
-        """Get suspects in 1-indexed column"""
-
-        # slicing syntax; starting with (column_num - 1), print every NUM_COLS'th element
-        return (set(self.suspects[(column_num - 1)::NUM_COLS]))
-
-    def column_by_name(self, column_name) -> Set[Suspect]:
-        """Get suspects in column by column name (A, B, C, D)"""
-        column_nums = {
-            "A": 1,
-            "B": 2,
-            "C": 3,
-            "D": 4
-        }
-        return self.column(column_nums[column_name])
-
-    def find_suspect(self, suspect_name: str) -> Suspect:
-        for suspect in self.suspects:
-            if suspect.name == suspect_name:
-                return suspect
-        raise ValueError(f"suspect {suspect_name} not found")
-
-
-class Puzzle:
-    verdicts: List[BoolRef]  # true iff suspect is innocent
-    solved_verdicts: Set[int]  # indexes of verdicts with known solutions
-    solver: Solver
-
-    underlying_puzzle: PuzzleData  # can get out of sync with self.verdicts
-
-    def __init__(self, puzzle_data: PuzzleData) -> None:
-        self.underlying_puzzle = puzzle_data
-        self.verdicts = BoolVector('s', len(puzzle_data.suspects))
-        self.solved_verdicts = set()
-        self.solver = Solver()
-
-    def find_suspect_ref(self, suspect_name: str) -> Tuple[BoolRef, int]:
-        for idx, suspect in enumerate(self.underlying_puzzle.suspects):
-            if suspect.name == suspect_name:
-                return self.verdicts[idx], idx
-        raise ValueError(f"suspect {suspect_name} not found")
-
-    def find_suspect_set_refs(self, suspects: Set[Suspect]) -> Set[BoolRef]:
-        refs: Set[BoolRef] = set()
-        for idx, suspect in enumerate(self.underlying_puzzle.suspects):
-            if suspect in suspects:
-                refs.add(self.verdicts[idx])
-        return refs
-
     def set_single_verdict(self, suspect_name: str, is_innocent: bool):
-        ref, idx = self.find_suspect_ref(suspect_name)
-        self.solved_verdicts.add(idx)
-
-        # keep underlying puzzle data in sync
-        suspect = self.underlying_puzzle.find_suspect(suspect_name)
+        suspect = self.suspects[suspect_name]
+        self.unsolved_suspects.discard(suspect)
 
         if is_innocent:
-            self.solver.add(ref)
-            suspect.verdict = Verdict.INNOCENT
+            self.solver.add(suspect.is_innocent)
         else:
-            self.solver.add(Not(ref))
-            suspect.verdict = Verdict.CRIMINAL
+            self.solver.add(Not(suspect.is_innocent))
 
     # Try to deduce additional verdicts; returns true if a suspect's status was deduced
-    def deduce(self) -> bool:
-        all_verdict_indexes = set(range(0, len(self.verdicts)))
-        unknown_verdict_indexes = all_verdict_indexes.difference(
-            self.solved_verdicts)
-
-        for idx in unknown_verdict_indexes:
+    def solve_one(self) -> bool:
+        for suspect in self.unsolved_suspects:
             assert self.solver.check() == sat, "Solver is not currently satisfiable!"
-            # print(f'Checking suspect w/ idx {idx}')
 
-            # check if suspect being innocent creates contradiction
+        # check if suspect being innocent creates contradiction
             self.solver.push()
-            self.solver.add(self.verdicts[idx])
+            self.solver.add(suspect.is_innocent)
             if self.solver.check() == unsat:
                 # suspect must be criminal
                 # pop the supposition that suspect was innocent, set suspect to be criminal
                 self.solver.pop()
-                self.solver.add(Not(self.verdicts[idx]))
-
-                self.solved_verdicts.add(idx)
-                print(f'suspect #{idx} is criminal')
-                # TODO - update underlying suspect data
+                self.solver.add(Not(suspect.is_innocent))
+                self.unsolved_suspects.discard(suspect)
+                print(f'{suspect.name} is criminal')
                 return True
             else:
                 # reset to previous backtracking point
                 self.solver.pop()
 
-            # check if suspect being criminal creates contradiction
+        # check if suspect being criminal creates contradiction
             self.solver.push()
-            self.solver.add(Not(self.verdicts[idx]))
+            self.solver.add(Not(suspect.is_innocent))
             if self.solver.check() == unsat:
                 # suspect must be innocent
                 # pop the supposition that suspect was criminal, set suspect to be innocent
                 self.solver.pop()
-                self.solver.add(self.verdicts[idx])
-
-                self.solved_verdicts.add(idx)
-                print(f'suspect #{idx} is innocent')
-                # TODO - update underlying suspect data
+                self.solver.add(suspect.is_innocent)
+                self.unsolved_suspects.discard(suspect)
+                print(f'{suspect.name} is innocent')
                 return True
             else:
                 # reset to previous backtracking point
                 self.solver.pop()
-
-            # print(f'No verdict deduced for suspect {idx}')
 
         return False
 
     # Deduce as many verdicts as can be found with current clues
     # Returns true if some progress was made (regardless of how much)
-    def deduce_all(self) -> bool:
+    def solve_many(self) -> bool:
         can_make_progress = True
         progress_made = False
         while can_make_progress:
-            can_make_progress = self.deduce()
+            can_make_progress = self.solve_one()
             if can_make_progress:
                 progress_made = True
         return progress_made
-
-
-def initialize_suspect(json_data: dict) -> Suspect:
-    return Suspect(
-        name=json_data["name"],
-        profession=json_data["profession"],
-        verdict=Verdict.UNKNOWN,
-        neighbors=set()
-    )
-
-
-def initialize_puzzle_data(json_string: str) -> PuzzleData:
-    puzzle = PuzzleData(suspects=[])
-
-    # Used as initial element of grid
-    dummy_suspect = Suspect(
-        name="dummy",
-        profession="none",
-        verdict=Verdict.UNKNOWN,
-        neighbors=set()
-    )
-    grid = [[dummy_suspect for col in range(
-        NUM_COLS)] for row in range(NUM_ROWS)]
-
-    idx = 0
-    data: List[dict] = json.loads(json_string)
-    for suspect_data in data:
-        suspect = initialize_suspect(suspect_data)
-        puzzle.suspects.append(suspect)
-
-        # set up 2D grid to be used when setting up suspects' neighbors
-        grid[idx // NUM_COLS][idx % NUM_COLS] = suspect
-        idx += 1
-
-    # set up suspects' neighbors
-    for row in range(NUM_ROWS):
-        for col in range(NUM_COLS):
-            suspect = grid[row][col]
-            for dx in range(-1, 2):
-                for dy in range(-1, 2):
-                    if dx == 0 and dy == 0:
-                        continue
-                    neighbor_row = row + dx
-                    neighbor_col = col + dy
-                    if neighbor_row < 0 or neighbor_row >= NUM_ROWS:
-                        continue
-                    if neighbor_col < 0 or neighbor_col >= NUM_COLS:
-                        continue
-                    neighbor = grid[neighbor_row][neighbor_col]
-                    suspect.neighbors.add(neighbor)
-    return puzzle
-
-
-def print_grid(grid: List[List[Suspect]]):
-    for row in grid:
-        for suspect in row:
-            print(suspect.name, end='')
-        print()
 
 
 # Get this from browser console
@@ -300,25 +169,37 @@ input_data = '[{"name":"Alex","profession":"cook"},{"name":"Bonnie","profession"
 
 
 def main():
-    puzzle_data = initialize_puzzle_data(input_data)
-    puzzle = Puzzle(puzzle_data)
+    puzzle = Puzzle(input_data)
 
     # initial uncovered suspect
     puzzle.set_single_verdict("Frank", True)
 
     # first clue, from Frank - "Exactly 1 innocent in column A is neighboring Megan"
-    column_a_suspects = puzzle_data.column_by_name("A")
-    megan_neighbors = puzzle_data.find_suspect("Megan").neighbors
+    column_a_suspects = puzzle.column(Column.A)
+    megan_neighbors = puzzle.suspects["Megan"].neighbors
     relevant_suspects = column_a_suspects.intersection(megan_neighbors)
 
-    # for suspect in relevant_suspects:
-    #     print(suspect.name)
+    print("Column A:")
+    for suspect in column_a_suspects:
+        print(suspect.name)
+    print()
 
-    relevant_suspect_refs = puzzle.find_suspect_set_refs(relevant_suspects)
+    print("Megan neighbors:")
+    for suspect in megan_neighbors:
+        print(suspect.name)
+    print()
+
+    print("Relevant suspects:")
+    for suspect in relevant_suspects:
+        print(suspect.name)
+    print()
+
+    relevant_suspect_refs = [
+        suspect.is_innocent for suspect in relevant_suspects]
     puzzle.solver.add(AtLeast(*relevant_suspect_refs, 1))
     puzzle.solver.add(AtMost(*relevant_suspect_refs, 1))
 
-    puzzle.deduce_all()
+    puzzle.solve_many()
 
     # second clue, from Keith - "There's an odd number of criminals to the left of Sofia"
 

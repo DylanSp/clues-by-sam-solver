@@ -256,6 +256,49 @@ def main():
 
     # fourth clue, from Alex - "Both criminals below me are connected"
 
+    # "Both criminals" = exactly 2 criminals below
+    clue4_below = puzzle.get_suspects_relative_to_other_suspect(
+        "Alex", Direction.BELOW)
+    clue4_below_refs = [suspect.is_innocent for suspect in clue4_below]
+    puzzle.solver.add(AtLeast(*clue4_below_refs, 2))
+    puzzle.solver.add(AtMost(*clue4_below_refs, 2))
+
+    # "Are connected"
+    # TODO - hardcodes 2 connected out of length 4 - generalize
+    clue4_below_sorted = sort_vertical_suspects(clue4_below)
+    assert len(clue4_below_sorted) == 4
+    puzzle.solver.add(Or(
+        And(
+            Not(clue4_below_sorted[0].is_innocent),
+            Not(clue4_below_sorted[1].is_innocent),
+            clue4_below_sorted[2].is_innocent,
+            clue4_below_sorted[3].is_innocent
+        ),
+        And(
+            clue4_below_sorted[0].is_innocent,
+            Not(clue4_below_sorted[1].is_innocent),
+            Not(clue4_below_sorted[2].is_innocent),
+            clue4_below_sorted[3].is_innocent
+        ),
+        And(
+            clue4_below_sorted[0].is_innocent,
+            clue4_below_sorted[1].is_innocent,
+            Not(clue4_below_sorted[2].is_innocent),
+            Not(clue4_below_sorted[3].is_innocent)
+        ),
+    ))
+
+    puzzle.solve_many()
+    print()
+
+
+def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
+    # Check that all suspects are in the same column
+    # create a set of all unique column values - should have exactly 1 element
+    assert len({s.column for s in suspects}) == 1
+
+    return sorted(suspects, key=lambda suspect: suspect.name)
+
 
 if __name__ == "__main__":
     main()

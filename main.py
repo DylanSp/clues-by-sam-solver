@@ -302,6 +302,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # sixth clue, from Xavi - "There are as many criminal farmers as there are criminal guards"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

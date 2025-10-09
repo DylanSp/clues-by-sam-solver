@@ -127,8 +127,10 @@ class Puzzle:
         self.unsolved_suspects.discard(suspect)
 
         if is_innocent:
+            print(f'{suspect_name} is innocent')
             self.solver.add(suspect.is_innocent)
         else:
+            print(f'{suspect_name} is criminal')
             self.solver.add(Not(suspect.is_innocent))
 
     # Try to deduce additional verdicts; returns true if a suspect's status was deduced
@@ -287,6 +289,15 @@ def main():
             Not(clue4_below_sorted[3].is_innocent)
         ),
     ))
+
+    puzzle.solve_many()
+    print()
+
+    # fifth clue, from Vicky - "Xavi is one of 4 innocents in column C"
+    puzzle.set_single_verdict("Xavi", True)
+    column3_refs = [suspect.is_innocent for suspect in puzzle.column(Column.C)]
+    puzzle.solver.add(AtLeast(*column3_refs, 4))
+    puzzle.solver.add(AtMost(*column3_refs, 4))
 
     puzzle.solve_many()
     print()

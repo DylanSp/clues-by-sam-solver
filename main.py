@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, IntEnum
 import json
 from typing import List, Set, Tuple
-from z3 import Int, Solver, sat, Or, And, Not, Bool, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat
+from z3 import Int, Solver, sat, Or, And, Not, If, Bool, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat, Sum
 
 NUM_ROWS = 5
 NUM_COLS = 4
@@ -132,6 +132,9 @@ class Puzzle:
         else:
             print(f'{suspect_name} is criminal')
             self.solver.add(Not(suspect.is_innocent))
+
+    def all_of_profession(self, profession_name: str) -> Set[Suspect]:
+        return set([suspect for suspect in self.suspects.values() if suspect.profession == profession_name])
 
     # Try to deduce additional verdicts; returns true if a suspect's status was deduced
     def solve_one(self) -> bool:
@@ -303,6 +306,14 @@ def main():
     print()
 
     # sixth clue, from Xavi - "There are as many criminal farmers as there are criminal guards"
+    farmers = puzzle.all_of_profession("farmer")
+    guards = puzzle.all_of_profession("guard")
+    criminal_farmer_count = Sum([If(f.is_innocent, 0, 1) for f in farmers])
+    criminal_guard_count = Sum([If(g.is_innocent, 0, 1) for g in guards])
+    puzzle.solver.add(criminal_farmer_count == criminal_guard_count)
+
+    puzzle.solve_many()
+    print()
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 import json
-from typing import List, Set, Tuple
+from typing import List, Optional, Set, Tuple
 from z3 import Int, Solver, sat, Or, And, Not, If, Bool, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat, Sum
 
 NUM_ROWS = 5
@@ -40,6 +40,23 @@ class Suspect:
     # Names are unique and immutable, so can be used for equality testing; can't use default hash because Sets aren't hashable
     def __hash__(self) -> int:
         return hash(self.name)
+
+    def neighbor_in_direction(self, direction: Direction) -> Optional['Suspect']:
+        for neighbor in self.neighbors:
+            match direction:
+                case Direction.ABOVE:
+                    if neighbor.column == self.column and neighbor.row == self.row - 1:
+                        return neighbor
+                case Direction.BELOW:
+                    if neighbor.column == self.column and neighbor.row == self.row + 1:
+                        return neighbor
+                case Direction.LEFT:
+                    if neighbor.row == self.row and neighbor.column == self.column - 1:
+                        return neighbor
+                case Direction.RIGHT:
+                    if neighbor.row == self.row and neighbor.column == self.column + 1:
+                        return neighbor
+        return None
 
 
 class Puzzle:
@@ -264,6 +281,7 @@ def main():
     # "Both criminals" = exactly 2 criminals below
     clue4_below = puzzle.get_suspects_relative_to_other_suspect(
         "Alex", Direction.BELOW)
+    # TODO - should be Not(suspect.is_innocent), because criminals
     clue4_below_refs = [suspect.is_innocent for suspect in clue4_below]
     puzzle.solver.add(AtLeast(*clue4_below_refs, 2))
     puzzle.solver.add(AtMost(*clue4_below_refs, 2))
@@ -316,6 +334,15 @@ def main():
     print()
 
     # seventh clue, from Chris - "Exactly 1 guard has a criminal directly below them"
+    guard_neighbors = [g.neighbor_in_direction(
+        Direction.BELOW) for g in guards]
+    filtered_guard_neighbor_refs = [
+        Not(n.is_innocent) for n in guard_neighbors if n is not None]
+    puzzle.solver.add(AtLeast(*filtered_guard_neighbor_refs, 1))
+    puzzle.solver.add(AtMost(*filtered_guard_neighbor_refs, 1))
+
+    puzzle.solve_many()
+    print()
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:

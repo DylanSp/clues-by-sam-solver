@@ -281,8 +281,7 @@ def main():
     # "Both criminals" = exactly 2 criminals below
     clue4_below = puzzle.get_suspects_relative_to_other_suspect(
         "Alex", Direction.BELOW)
-    # TODO - should be Not(suspect.is_innocent), because criminals
-    clue4_below_refs = [suspect.is_innocent for suspect in clue4_below]
+    clue4_below_refs = [Not(suspect.is_innocent) for suspect in clue4_below]
     puzzle.solver.add(AtLeast(*clue4_below_refs, 2))
     puzzle.solver.add(AtMost(*clue4_below_refs, 2))
 

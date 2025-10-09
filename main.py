@@ -315,6 +315,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # seventh clue, from Chris - "Exactly 1 guard has a criminal directly below them"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

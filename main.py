@@ -343,6 +343,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # eighth clue, from Isaac - "Exactly 2 of the 3 criminals neighboring Megan are above Vicky"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

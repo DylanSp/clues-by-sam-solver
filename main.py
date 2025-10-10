@@ -443,6 +443,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # fifteenth clue, from Terry - "Both criminals above Zara are Isaac's neighbors"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

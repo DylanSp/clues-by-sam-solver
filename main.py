@@ -395,6 +395,22 @@ def main():
 
     # eleventh clue, from Bonnie - "Column C has more innocents than any other column"
 
+    colA_count = Sum([If(s.is_innocent, 1, 0)
+                     for s in puzzle.column(Column.A)])
+    colB_count = Sum([If(s.is_innocent, 1, 0)
+                     for s in puzzle.column(Column.B)])
+    colC_count = Sum([If(s.is_innocent, 1, 0)
+                     for s in puzzle.column(Column.C)])
+    colD_count = Sum([If(s.is_innocent, 1, 0)
+                     for s in puzzle.column(Column.D)])
+
+    puzzle.solver.add(colC_count > colA_count)
+    puzzle.solver.add(colC_count > colB_count)
+    puzzle.solver.add(colC_count > colD_count)
+
+    puzzle.solve_many()
+    print()
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

@@ -445,6 +445,21 @@ def main():
 
     # fifteenth clue, from Terry - "Both criminals above Zara are Isaac's neighbors"
 
+    # exactly 2 criminals above Zara
+    above_zara_refs = [Not(s.is_innocent) for s in puzzle.get_suspects_relative_to_other_suspect(
+        "Zara", Direction.ABOVE)]
+    puzzle.solver.add(AtLeast(*above_zara_refs, 2))
+    puzzle.solver.add(AtMost(*above_zara_refs, 2))
+
+    # exactly 2 criminals in intersection of "above Zara" and Isaac's neighbors
+    clue15_part2_refs = [Not(s.is_innocent) for s in puzzle.get_suspects_relative_to_other_suspect(
+        "Zara", Direction.ABOVE).intersection(puzzle.suspects["Isaac"].neighbors)]
+    puzzle.solver.add(AtLeast(*clue15_part2_refs, 2))
+    puzzle.solver.add(AtMost(*clue15_part2_refs, 2))
+
+    puzzle.solve_many()
+    print()
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

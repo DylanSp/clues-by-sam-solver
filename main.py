@@ -472,7 +472,15 @@ def main():
     puzzle.solve_many()
     print()
 
-    # seventeenth clue, from Zara - "Xavi has more innocent neighbors than Isaac"
+    # seventeenth and final clue, from Zara - "Xavi has more innocent neighbors than Isaac"
+    xavi_innocent_count = Sum([If(s.is_innocent, 1, 0)
+                               for s in puzzle.suspects["Xavi"].neighbors])
+    isaac_innocent_count = Sum([If(s.is_innocent, 1, 0)
+                               for s in puzzle.suspects["Isaac"].neighbors])
+    puzzle.solver.add(xavi_innocent_count > isaac_innocent_count)
+
+    puzzle.solve_many()
+    print()
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:

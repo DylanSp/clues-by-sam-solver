@@ -362,6 +362,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # ninth clue, from Helen - "All innocents in row 5 are connected"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

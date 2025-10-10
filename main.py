@@ -345,6 +345,23 @@ def main():
 
     # eighth clue, from Isaac - "Exactly 2 of the 3 criminals neighboring Megan are above Vicky"
 
+    # Megan has 3 criminal neighbors
+    megan_neighbor_refs = [Not(n.is_innocent)
+                           for n in puzzle.suspects["Megan"].neighbors]
+    puzzle.solver.add(AtLeast(*megan_neighbor_refs, 3))
+    puzzle.solver.add(AtMost(*megan_neighbor_refs, 3))
+
+    # 2 criminals above Vicky, neighboring Megan, are criminal
+    above_vicky = puzzle.get_suspects_relative_to_other_suspect(
+        "Vicky", Direction.ABOVE)
+    clue8_part2_refs = [Not(s.is_innocent) for s in above_vicky.intersection(
+        puzzle.suspects["Megan"].neighbors)]
+    puzzle.solver.add(AtLeast(*clue8_part2_refs, 2))
+    puzzle.solver.add(AtMost(*clue8_part2_refs, 2))
+
+    puzzle.solve_many()
+    print()
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

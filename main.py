@@ -192,6 +192,7 @@ class Puzzle:
 
     # Deduce as many verdicts as can be found with current clues
     # Returns true if some progress was made (regardless of how much)
+    # TODO - does this need to return a value?
     def solve_many(self) -> bool:
         can_make_progress = True
         progress_made = False
@@ -407,6 +408,25 @@ def main():
     puzzle.solver.add(colC_count > colA_count)
     puzzle.solver.add(colC_count > colB_count)
     puzzle.solver.add(colC_count > colD_count)
+
+    puzzle.solve_many()
+    print()
+
+    # twelfth clue, from Megan - "there are more criminals than innocents in row 1"
+    row1_innocent_count = Sum([If(s.is_innocent, 1, 0) for s in puzzle.row(1)])
+    row1_criminal_count = Sum([If(Not(s.is_innocent), 1, 0)
+                              for s in puzzle.row(1)])
+    puzzle.solver.add(row1_criminal_count > row1_innocent_count)
+
+    puzzle.solve_many()
+    print()
+
+    # thirteenth clue, from Ellie - "Chris has more criminal neighbors than Paula"
+    chris_criminal_count = Sum([If(Not(s.is_innocent), 1, 0)
+                               for s in puzzle.suspects["Chris"].neighbors])
+    paula_criminal_count = Sum([If(Not(s.is_innocent), 1, 0)
+                               for s in puzzle.suspects["Paula"].neighbors])
+    puzzle.solver.add(chris_criminal_count > paula_criminal_count)
 
     puzzle.solve_many()
     print()

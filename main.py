@@ -460,6 +460,18 @@ def main():
     puzzle.solve_many()
     print()
 
+    # sixteenth clue, from Olof - "The only criminal below Julie is Terry's neighbor"
+    below_julie = puzzle.get_suspects_relative_to_other_suspect(
+        "Julie", Direction.BELOW)
+
+    # exactly 1 criminal below Julie
+    clue16_part1_refs = [Not(s.is_innocent) for s in below_julie]
+    puzzle.solver.add(AtLeast(*clue16_part1_refs, 1))
+    puzzle.solver.add(AtMost(*clue16_part1_refs, 1))
+
+    puzzle.solve_many()
+    print()
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

@@ -382,6 +382,16 @@ def main():
     print()
 
     # tenth clue, from Wally - "An odd number of innocents in row 1 neighbor Helen"
+    clue10_refs = [s.is_innocent for s in puzzle.row(
+        1).intersection(puzzle.suspects["Helen"].neighbors)]
+    puzzle.solver.add(Or(
+        And(AtLeast(*clue10_refs, 1), AtMost(*clue10_refs, 1)),
+        And(AtLeast(*clue10_refs, 3), AtMost(*clue10_refs, 3)),
+        And(AtLeast(*clue10_refs, 5), AtMost(*clue10_refs, 5))
+    ))
+
+    puzzle.solve_many()
+    print()
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:

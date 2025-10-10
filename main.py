@@ -21,6 +21,14 @@ class Column(IntEnum):
     D = 3
 
 
+column_lookup: dict[str, Column] = {
+    "A": Column.A,
+    "B": Column.B,
+    "C": Column.C,
+    "D": Column.D
+}
+
+
 class Direction(Enum):
     ABOVE = 1
     BELOW = 2
@@ -204,6 +212,17 @@ class Puzzle:
             if can_make_progress:
                 progress_made = True
         return progress_made
+
+    def handle_clue(self, clue: str):
+        match clue.split():
+            case ["Exactly", num_suspects, ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "in", "column", column, "is", "neighboring", suspect_name]:
+                column_suspects = self.column(column_lookup[column])
+                neighbors = self.suspects[suspect_name].neighbors
+                relevant_suspects = column_suspects & neighbors
+                if verdict == 'innocent' or 'innocents':
+                    pass
+                elif verdict == 'criminal' or 'criminals':
+                    pass
 
 
 # Get this from browser console

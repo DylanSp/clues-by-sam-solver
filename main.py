@@ -224,21 +224,6 @@ def main():
     megan_neighbors = puzzle.suspects["Megan"].neighbors
     relevant_suspects = column_a_suspects.intersection(megan_neighbors)
 
-    print("Column A:")
-    for suspect in column_a_suspects:
-        print(suspect.name)
-    print()
-
-    print("Megan neighbors:")
-    for suspect in megan_neighbors:
-        print(suspect.name)
-    print()
-
-    print("Relevant suspects:")
-    for suspect in relevant_suspects:
-        print(suspect.name)
-    print()
-
     relevant_suspect_refs = [
         suspect.is_innocent for suspect in relevant_suspects]
     puzzle.solver.add(AtLeast(*relevant_suspect_refs, 1))
@@ -250,11 +235,6 @@ def main():
     # second clue, from Keith - "There's an odd number of criminals to the left of Sofia"
     clue2_relevant = puzzle.get_suspects_relative_to_other_suspect(
         "Sofia", Direction.LEFT)
-    print("Relevant suspects:")
-    for suspect in clue2_relevant:
-        print(suspect.name)
-    print()
-
     clue2_relevant_refs = [suspect.is_innocent for suspect in clue2_relevant]
 
     puzzle.solver.add(Or(
@@ -269,11 +249,6 @@ def main():
     # third clue, from Ryan - "There is only one innocent above Keith"
     clue3_relevant = puzzle.get_suspects_relative_to_other_suspect(
         "Keith", Direction.ABOVE)
-    print("Relevant suspects:")
-    for suspect in clue3_relevant:
-        print(suspect.name)
-    print()
-
     clue3_relevant_refs = [suspect.is_innocent for suspect in clue3_relevant]
     puzzle.solver.add(AtLeast(*clue3_relevant_refs, 1))
     puzzle.solver.add(AtMost(*clue3_relevant_refs, 1))

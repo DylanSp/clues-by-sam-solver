@@ -153,6 +153,9 @@ class Puzzle:
     def all_of_profession(self, profession_name: str) -> Set[Suspect]:
         return set([suspect for suspect in self.suspects.values() if suspect.profession == profession_name])
 
+    def edges(self) -> Set[Suspect]:
+        return self.row(1) | self.row(5) | self.column(Column.A) | self.column(Column.D)
+
     # Try to deduce additional verdicts; returns true if a suspect's status was deduced
     def solve_one(self) -> bool:
         for suspect in self.unsolved_suspects:
@@ -432,6 +435,13 @@ def main():
     print()
 
     # fourteenth clue, from Julie - "Terry is one of two or more innocents on the edges"
+    puzzle.set_single_verdict("Terry", True)
+
+    edge_refs = [s.is_innocent for s in puzzle.edges()]
+    puzzle.solver.add(AtLeast(*edge_refs, 2))
+
+    puzzle.solve_many()
+    print()
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:

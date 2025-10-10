@@ -472,6 +472,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # seventeenth clue, from Zara - "Xavi has more innocent neighbors than Isaac"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

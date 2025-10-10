@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, IntEnum
 import json
 from typing import List, Optional, Set, Tuple
-from z3 import Int, Solver, sat, Or, And, Not, If, Bool, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat, Sum
+from z3 import Int, Solver, sat, Or, And, Not, If, Bool, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat, Sum, ForAll, Exists
 
 NUM_ROWS = 5
 NUM_COLS = 4
@@ -363,6 +363,23 @@ def main():
     print()
 
     # ninth clue, from Helen - "All innocents in row 5 are connected"
+
+    # "All innocents are connected" is false iff some criminal in the row has innocents on both left and right
+    constraint_list = []
+    for suspect in puzzle.row(5):
+        left_neighbor = suspect.neighbor_in_direction(Direction.LEFT)
+        right_neighbor = suspect.neighbor_in_direction(Direction.RIGHT)
+        if left_neighbor is not None and right_neighbor is not None:
+            # this is true iff innocents in the row are NOT connected
+            counterexample_constraint = And(
+                Not(suspect.is_innocent), left_neighbor.is_innocent, right_neighbor.is_innocent)
+
+            constraint_list.append(counterexample_constraint)
+    # the counterexample is not true for any suspect in the row
+    puzzle.solver.add(Not(Or(*constraint_list)))
+
+    puzzle.solve_many()
+    print()
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:

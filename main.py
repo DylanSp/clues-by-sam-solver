@@ -431,6 +431,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # fourteenth clue, from Julie - "Terry is one of two or more innocents on the edges"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

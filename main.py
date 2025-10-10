@@ -393,6 +393,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # eleventh clue, from Bonnie - "Column C has more innocents than any other column"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

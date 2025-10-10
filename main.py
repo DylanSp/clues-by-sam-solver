@@ -381,6 +381,8 @@ def main():
     puzzle.solve_many()
     print()
 
+    # tenth clue, from Wally - "An odd number of innocents in row 1 neighbor Helen"
+
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     # Check that all suspects are in the same column

@@ -264,22 +264,22 @@ class Puzzle:
             case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict, "in", "column", column_name]:
                 relevant_suspects = self.column(Column.parse(column_name))
 
-                if verdict == "innocent":
+                if verdict == "innocents":
                     self.set_single_verdict(suspect_name, True)
                     self.set_has_exactly_n_innocents(
                         relevant_suspects, int(num_suspects))
-                elif verdict == "criminal":
+                elif verdict == "criminals":
                     self.set_single_verdict(suspect_name, False)
                     self.set_has_exactly_n_criminals(
                         relevant_suspects, int(num_suspects))
             case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict, "in", "row", row]:
                 relevant_suspects = self.row(int(row))
 
-                if verdict == "innocent":
+                if verdict == "innocents":
                     self.set_single_verdict(suspect_name, True)
                     self.set_has_exactly_n_innocents(
                         relevant_suspects, int(num_suspects))
-                elif verdict == "criminal":
+                elif verdict == "criminals":
                     self.set_single_verdict(suspect_name, False)
                     self.set_has_exactly_n_criminals(
                         relevant_suspects, int(num_suspects))

@@ -232,7 +232,10 @@ class Puzzle:
                     self.set_has_exactly_n_criminals(
                         relevant_suspects, int(num_suspects))
             case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "to", "the", ("left" | "right") as direction_name, "of", suspect_name]:
-                direction = Direction.LEFT if direction_name == "left" else Direction.RIGHT
+                if direction_name == "left":
+                    direction = Direction.LEFT
+                elif direction_name == "right":
+                    direction = Direction.RIGHT
                 parity = Parity.ODD if parity_str == "odd" else Parity.EVEN
                 relevant_suspects = self.get_suspects_relative_to_other_suspect(
                     suspect_name, direction)
@@ -241,6 +244,18 @@ class Puzzle:
                     self.set_has_parity(relevant_suspects, parity, True)
                 elif verdict == 'criminal' or 'criminals':
                     self.set_has_parity(relevant_suspects, parity, False)
+            case ["There", "is", "only", "one", ('innocent' | 'criminal') as verdict, ("above" | "below") as direction_name, suspect_name]:
+                if direction_name == "above":
+                    direction = Direction.ABOVE
+                elif direction_name == "below":
+                    direction = Direction.BELOW
+                relevant_suspects = self.get_suspects_relative_to_other_suspect(
+                    suspect_name, direction)
+
+                if verdict == "innocent":
+                    self.set_has_exactly_n_innocents(relevant_suspects, 1)
+                elif verdict == "criminal":
+                    self.set_has_exactly_n_criminals(relevant_suspects, 1)
 
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
         refs = [suspect.is_innocent for suspect in suspects]
@@ -303,12 +318,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # third clue, from Ryan - "There is only one innocent above Keith"
-    clue3_relevant = puzzle.get_suspects_relative_to_other_suspect(
-        "Keith", Direction.ABOVE)
-    clue3_relevant_refs = [suspect.is_innocent for suspect in clue3_relevant]
-    puzzle.solver.add(AtLeast(*clue3_relevant_refs, 1))
-    puzzle.solver.add(AtMost(*clue3_relevant_refs, 1))
+    # third clue, from Ryan
+    puzzle.handle_clue("There is only one innocent above Keith")
     puzzle.solve_many()
     print()
 

@@ -14,19 +14,26 @@ class Verdict(Enum):
     UNKNOWN = 3
 
 
+# IntEnum so we can set column numerically when setting up the grid of suspects
 class Column(IntEnum):
     A = 0
     B = 1
     C = 2
     D = 3
 
+    @classmethod
+    def parse(cls, input: str) -> "Column":
+        match input:
+            case "A" | "a":
+                return Column.A
+            case "B" | "b":
+                return Column.B
+            case "C" | "c":
+                return Column.C
+            case "D" | "d":
+                return Column.D
 
-column_lookup: dict[str, Column] = {
-    "A": Column.A,
-    "B": Column.B,
-    "C": Column.C,
-    "D": Column.D
-}
+        raise ValueError(f"{input} is not a valid column")
 
 
 class Direction(Enum):
@@ -221,7 +228,7 @@ class Puzzle:
     def handle_clue(self, clue: str):
         match clue.split():
             case ["Exactly", num_suspects, ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "in", "column", column, "is", "neighboring", suspect_name]:
-                column_suspects = self.column(column_lookup[column])
+                column_suspects = self.column(Column.parse(column))
                 neighbors = self.suspects[suspect_name].neighbors
                 relevant_suspects = column_suspects & neighbors
 

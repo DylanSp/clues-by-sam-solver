@@ -283,6 +283,24 @@ class Puzzle:
                     self.set_single_verdict(suspect_name, False)
                     self.set_has_exactly_n_criminals(
                         relevant_suspects, int(num_suspects))
+            case ["There", "are", "as", "many", "innocent", profession1_plural, "as", "there", "are", "innocent", profession2_plural]:
+                profession1 = profession1_plural.removesuffix("s")
+                profession2 = profession2_plural.removesuffix("s")
+                profession1_count = count_innocents(
+                    self.all_of_profession(profession1))
+                profession2_count = count_innocents(
+                    self.all_of_profession(profession2))
+
+                self.solver.add(profession1_count == profession2_count)
+            case ["There", "are", "as", "many", "criminal", profession1_plural, "as", "there", "are", "criminal", profession2_plural]:
+                profession1 = profession1_plural.removesuffix("s")
+                profession2 = profession2_plural.removesuffix("s")
+                profession1_count = count_criminals(
+                    self.all_of_profession(profession1))
+                profession2_count = count_criminals(
+                    self.all_of_profession(profession2))
+
+                self.solver.add(profession1_count == profession2_count)
 
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
         refs = [suspect.is_innocent for suspect in suspects]
@@ -393,17 +411,14 @@ def main():
     puzzle.solve_many()
     print()
 
-    # sixth clue, from Xavi - "There are as many criminal farmers as there are criminal guards"
-    farmers = puzzle.all_of_profession("farmer")
-    guards = puzzle.all_of_profession("guard")
-    criminal_farmer_count = Sum([If(f.is_innocent, 0, 1) for f in farmers])
-    criminal_guard_count = Sum([If(g.is_innocent, 0, 1) for g in guards])
-    puzzle.solver.add(criminal_farmer_count == criminal_guard_count)
-
+    # sixth clue, from Xavi
+    puzzle.handle_clue(
+        "There are as many criminal farmers as there are criminal guards")
     puzzle.solve_many()
     print()
 
     # seventh clue, from Chris - "Exactly 1 guard has a criminal directly below them"
+    guards = puzzle.all_of_profession("guard")
     guard_neighbors = [g.neighbor_in_direction(
         Direction.BELOW) for g in guards]
     filtered_guard_neighbor_refs = [

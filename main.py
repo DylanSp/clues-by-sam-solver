@@ -220,12 +220,24 @@ class Puzzle:
                 neighbors = self.suspects[suspect_name].neighbors
                 relevant_suspects = column_suspects & neighbors
                 if verdict == 'innocent' or 'innocents':
-                    pass
+                    self.set_has_exactly_n_innocents(
+                        relevant_suspects, int(num_suspects))
                 elif verdict == 'criminal' or 'criminals':
-                    pass
+                    self.set_has_exactly_n_criminals(
+                        relevant_suspects, int(num_suspects))
 
+    def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
+        refs = [suspect.is_innocent for suspect in suspects]
+        self.solver.add(AtLeast(*refs, num_innocents))
+        self.solver.add(AtMost(*refs, num_innocents))
+
+    def set_has_exactly_n_criminals(self, suspects: set[Suspect], num_criminals: int):
+        refs = [Not(suspect.is_innocent) for suspect in suspects]
+        self.solver.add(AtLeast(*refs, num_criminals))
+        self.solver.add(AtMost(*refs, num_criminals))
 
 # Get this from browser console
+
 
 # data from Puzzle Pack #1, puzzle 1
 # https://cluesbysam.com/s/user/63f90e0e67bb92cd/pack-1/1/
@@ -238,15 +250,8 @@ def main():
     # initial uncovered suspect
     puzzle.set_single_verdict("Frank", True)
 
-    # first clue, from Frank - "Exactly 1 innocent in column A is neighboring Megan"
-    column_a_suspects = puzzle.column(Column.A)
-    megan_neighbors = puzzle.suspects["Megan"].neighbors
-    relevant_suspects = column_a_suspects.intersection(megan_neighbors)
-
-    relevant_suspect_refs = [
-        suspect.is_innocent for suspect in relevant_suspects]
-    puzzle.solver.add(AtLeast(*relevant_suspect_refs, 1))
-    puzzle.solver.add(AtMost(*relevant_suspect_refs, 1))
+    # first clue, from Frank
+    puzzle.handle_clue("Exactly 1 innocent in column A is neighboring Megan")
 
     puzzle.solve_many()
     print()

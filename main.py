@@ -227,8 +227,8 @@ class Puzzle:
 
     def handle_clue(self, clue: str):
         match clue.split():
-            case ["Exactly", num_suspects, ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "in", "column", column, "is", "neighboring", suspect_name]:
-                column_suspects = self.column(Column.parse(column))
+            case ["Exactly", num_suspects, ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "in", "column", column_name, "is", "neighboring", suspect_name]:
+                column_suspects = self.column(Column.parse(column_name))
                 neighbors = self.suspects[suspect_name].neighbors
                 relevant_suspects = column_suspects & neighbors
 
@@ -257,6 +257,28 @@ class Puzzle:
                     self.set_has_exactly_n_innocents(relevant_suspects, 1)
                 elif verdict == "criminal":
                     self.set_has_exactly_n_criminals(relevant_suspects, 1)
+            case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict, "in", "column", column_name]:
+                relevant_suspects = self.column(Column.parse(column_name))
+
+                if verdict == "innocent":
+                    self.set_single_verdict(suspect_name, True)
+                    self.set_has_exactly_n_innocents(
+                        relevant_suspects, int(num_suspects))
+                elif verdict == "criminal":
+                    self.set_single_verdict(suspect_name, False)
+                    self.set_has_exactly_n_criminals(
+                        relevant_suspects, int(num_suspects))
+            case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict, "in", "row", row]:
+                relevant_suspects = self.row(int(row))
+
+                if verdict == "innocent":
+                    self.set_single_verdict(suspect_name, True)
+                    self.set_has_exactly_n_innocents(
+                        relevant_suspects, int(num_suspects))
+                elif verdict == "criminal":
+                    self.set_single_verdict(suspect_name, False)
+                    self.set_has_exactly_n_criminals(
+                        relevant_suspects, int(num_suspects))
 
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
         refs = [suspect.is_innocent for suspect in suspects]
@@ -325,6 +347,7 @@ def main():
     print()
 
     # fourth clue, from Alex - "Both criminals below me are connected"
+    # TODO - when passing to handle_clue - how to handle "me"?
 
     # "Both criminals" = exactly 2 criminals below
     clue4_below = puzzle.get_suspects_relative_to_other_suspect(
@@ -361,12 +384,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # fifth clue, from Vicky - "Xavi is one of 4 innocents in column C"
-    puzzle.set_single_verdict("Xavi", True)
-    column3_refs = [suspect.is_innocent for suspect in puzzle.column(Column.C)]
-    puzzle.solver.add(AtLeast(*column3_refs, 4))
-    puzzle.solver.add(AtMost(*column3_refs, 4))
-
+    # fifth clue, from Vicky
+    puzzle.handle_clue("Xavi is one of 4 innocents in column C")
     puzzle.solve_many()
     print()
 

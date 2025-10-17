@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, IntEnum
 import json
 from typing import List, Optional, Set, Tuple
-from z3 import Int, Solver, sat, Or, And, Not, If, Bool, Bools, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat, Sum, ForAll, Exists
+from z3 import Int, Solver, sat, Or, And, Not, If, Bool, Bools, ArithRef, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat, Sum, ForAll, Exists
 
 NUM_ROWS = 5
 NUM_COLS = 4
@@ -253,32 +253,34 @@ class Puzzle:
         self.solver.add(AtMost(*refs, num_criminals))
 
     def set_has_parity(self, suspects: set[Suspect], parity: Parity, is_innocent: bool):
-        if is_innocent:
-            refs = [suspect.is_innocent for suspect in suspects]
-        else:
-            refs = [Not(suspect.is_innocent) for suspect in suspects]
-
-        # TODO - instead of hardcoding, use URem()?
-
-        if parity == Parity.ODD:
-            self.solver.add(Or(
-                And(AtLeast(*refs, 1), AtMost(*refs, 1)),
-                And(AtLeast(*refs, 3), AtMost(*refs, 3)),
-                And(AtLeast(*refs, 5), AtMost(*refs, 5)),
-                And(AtLeast(*refs, 7), AtMost(*refs, 7)),
-            ))
-        else:
-            self.solver.add(Or(
-                And(AtLeast(*refs, 0), AtMost(*refs, 0)),
-                And(AtLeast(*refs, 2), AtMost(*refs, 2)),
-                And(AtLeast(*refs, 4), AtMost(*refs, 4)),
-                And(AtLeast(*refs, 6), AtMost(*refs, 6)),
-                And(AtLeast(*refs, 8), AtMost(*refs, 8)),
-            ))
-
-# Get this from browser console
+        match is_innocent, parity:
+            case True, Parity.ODD:
+                self.solver.add(count_innocents(suspects) % 2 == 1)
+            case True, Parity.EVEN:
+                self.solver.add(count_innocents(suspects) % 2 == 0)
+            case False, Parity.ODD:
+                self.solver.add(count_criminals(suspects) % 2 == 1)
+            case False, Parity.EVEN:
+                self.solver.add(count_criminals(suspects) % 2 == 0)
 
 
+def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
+    # Check that all suspects are in the same column
+    # create a set of all unique column values - should have exactly 1 element
+    assert len({s.column for s in suspects}) == 1
+
+    return sorted(suspects, key=lambda suspect: suspect.name)
+
+
+def count_innocents(suspects: set[Suspect]):
+    return Sum([If(s.is_innocent, 1, 0) for s in suspects])
+
+
+def count_criminals(suspects: set[Suspect]):
+    return Sum([If(s.is_innocent, 0, 1) for s in suspects])
+
+
+# Get input data from browser console
 # data from Puzzle Pack #1, puzzle 1
 # https://cluesbysam.com/s/user/63f90e0e67bb92cd/pack-1/1/
 input_data = '[{"name":"Alex","profession":"cook"},{"name":"Bonnie","profession":"painter"},{"name":"Chris","profession":"cook"},{"name":"Ellie","profession":"cop"},{"name":"Frank","profession":"farmer"},{"name":"Helen","profession":"cook"},{"name":"Isaac","profession":"guard"},{"name":"Julie","profession":"clerk"},{"name":"Keith","profession":"farmer"},{"name":"Megan","profession":"painter"},{"name":"Nancy","profession":"guard"},{"name":"Olof","profession":"clerk"},{"name":"Paula","profession":"cop"},{"name":"Ryan","profession":"sleuth"},{"name":"Sofia","profession":"guard"},{"name":"Terry","profession":"sleuth"},{"name":"Vicky","profession":"farmer"},{"name":"Wally","profession":"mech"},{"name":"Xavi","profession":"mech"},{"name":"Zara","profession":"mech"}]'
@@ -511,14 +513,6 @@ def main():
 
     puzzle.solve_many()
     print()
-
-
-def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
-    # Check that all suspects are in the same column
-    # create a set of all unique column values - should have exactly 1 element
-    assert len({s.column for s in suspects}) == 1
-
-    return sorted(suspects, key=lambda suspect: suspect.name)
 
 
 if __name__ == "__main__":

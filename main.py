@@ -30,15 +30,15 @@ column_lookup: dict[str, Column] = {
 
 
 class Direction(Enum):
-    ABOVE = 1
-    BELOW = 2
-    LEFT = 3
-    RIGHT = 4
+    ABOVE = "above"
+    BELOW = "below"
+    LEFT = "left"
+    RIGHT = "right"
 
 
 class Parity(Enum):
-    ODD = 1
-    EVEN = 2
+    ODD = "odd"
+    EVEN = "even"
 
 
 @dataclass
@@ -232,11 +232,8 @@ class Puzzle:
                     self.set_has_exactly_n_criminals(
                         relevant_suspects, int(num_suspects))
             case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "to", "the", ("left" | "right") as direction_name, "of", suspect_name]:
-                if direction_name == "left":
-                    direction = Direction.LEFT
-                elif direction_name == "right":
-                    direction = Direction.RIGHT
-                parity = Parity.ODD if parity_str == "odd" else Parity.EVEN
+                direction = Direction(direction_name)
+                parity = Parity(parity_str)
                 relevant_suspects = self.get_suspects_relative_to_other_suspect(
                     suspect_name, direction)
 
@@ -245,10 +242,7 @@ class Puzzle:
                 elif verdict == 'criminal' or 'criminals':
                     self.set_has_parity(relevant_suspects, parity, False)
             case ["There", "is", "only", "one", ('innocent' | 'criminal') as verdict, ("above" | "below") as direction_name, suspect_name]:
-                if direction_name == "above":
-                    direction = Direction.ABOVE
-                elif direction_name == "below":
-                    direction = Direction.BELOW
+                direction = Direction(direction_name)
                 relevant_suspects = self.get_suspects_relative_to_other_suspect(
                     suspect_name, direction)
 

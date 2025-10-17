@@ -36,6 +36,11 @@ class Direction(Enum):
     RIGHT = 4
 
 
+class Parity(Enum):
+    ODD = 1
+    EVEN = 2
+
+
 @dataclass
 class Suspect:
     name: str
@@ -219,12 +224,23 @@ class Puzzle:
                 column_suspects = self.column(column_lookup[column])
                 neighbors = self.suspects[suspect_name].neighbors
                 relevant_suspects = column_suspects & neighbors
+
                 if verdict == 'innocent' or 'innocents':
                     self.set_has_exactly_n_innocents(
                         relevant_suspects, int(num_suspects))
                 elif verdict == 'criminal' or 'criminals':
                     self.set_has_exactly_n_criminals(
                         relevant_suspects, int(num_suspects))
+            case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "to", "the", ("left" | "right") as direction_name, "of", suspect_name]:
+                direction = Direction.LEFT if direction_name == "left" else Direction.RIGHT
+                parity = Parity.ODD if parity_str == "odd" else Parity.EVEN
+                relevant_suspects = self.get_suspects_relative_to_other_suspect(
+                    suspect_name, direction)
+
+                if verdict == 'innocent' or 'innocents':
+                    self.set_has_parity(relevant_suspects, parity, True)
+                elif verdict == 'criminal' or 'criminals':
+                    self.set_has_parity(relevant_suspects, parity, False)
 
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
         refs = [suspect.is_innocent for suspect in suspects]
@@ -235,6 +251,30 @@ class Puzzle:
         refs = [Not(suspect.is_innocent) for suspect in suspects]
         self.solver.add(AtLeast(*refs, num_criminals))
         self.solver.add(AtMost(*refs, num_criminals))
+
+    def set_has_parity(self, suspects: set[Suspect], parity: Parity, is_innocent: bool):
+        if is_innocent:
+            refs = [suspect.is_innocent for suspect in suspects]
+        else:
+            refs = [Not(suspect.is_innocent) for suspect in suspects]
+
+        # TODO - instead of hardcoding, use URem()?
+
+        if parity == Parity.ODD:
+            self.solver.add(Or(
+                And(AtLeast(*refs, 1), AtMost(*refs, 1)),
+                And(AtLeast(*refs, 3), AtMost(*refs, 3)),
+                And(AtLeast(*refs, 5), AtMost(*refs, 5)),
+                And(AtLeast(*refs, 7), AtMost(*refs, 7)),
+            ))
+        else:
+            self.solver.add(Or(
+                And(AtLeast(*refs, 0), AtMost(*refs, 0)),
+                And(AtLeast(*refs, 2), AtMost(*refs, 2)),
+                And(AtLeast(*refs, 4), AtMost(*refs, 4)),
+                And(AtLeast(*refs, 6), AtMost(*refs, 6)),
+                And(AtLeast(*refs, 8), AtMost(*refs, 8)),
+            ))
 
 # Get this from browser console
 
@@ -252,21 +292,12 @@ def main():
 
     # first clue, from Frank
     puzzle.handle_clue("Exactly 1 innocent in column A is neighboring Megan")
-
     puzzle.solve_many()
     print()
 
-    # second clue, from Keith - "There's an odd number of criminals to the left of Sofia"
-    clue2_relevant = puzzle.get_suspects_relative_to_other_suspect(
-        "Sofia", Direction.LEFT)
-    clue2_relevant_refs = [suspect.is_innocent for suspect in clue2_relevant]
-
-    puzzle.solver.add(Or(
-        And(AtLeast(*clue2_relevant_refs, 1), AtMost(*clue2_relevant_refs, 1)),
-        And(AtLeast(*clue2_relevant_refs, 3), AtMost(*clue2_relevant_refs, 3)),
-        And(AtLeast(*clue2_relevant_refs, 5), AtMost(*clue2_relevant_refs, 5))
-    ))
-
+    # second clue, from Keith
+    puzzle.handle_clue(
+        "There's an odd number of criminals to the left of Sofia")
     puzzle.solve_many()
     print()
 

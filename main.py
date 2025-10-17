@@ -78,6 +78,10 @@ class Suspect:
                         return neighbor
         return None
 
+    # Fast __repr__ method to allow debugging without needing to calculate repr for Z3 values
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} at {hex(id(self))}"
+
 
 class Puzzle:
     suspects: dict[str, Suspect]  # suspects by name

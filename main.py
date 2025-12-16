@@ -172,14 +172,14 @@ class Puzzle:
             case Direction.RIGHT:
                 return set([suspect for suspect in self.suspects.values() if suspect.row == root_suspect.row and suspect.column > root_suspect.column])
 
-    def set_single_verdict(self, suspect_name: str, is_innocent: bool):
+    def set_single_verdict(self, suspect_name: str, verdict: Verdict):
         suspect = self.suspects[suspect_name]
         self.unsolved_suspects.discard(suspect)
 
-        if is_innocent:
+        if verdict == Verdict.INNOCENT:
             print(f'{suspect_name} is innocent')
             self.solver.add(suspect.is_innocent)
-        else:
+        elif verdict == Verdict.CRIMINAL:
             print(f'{suspect_name} is criminal')
             self.solver.add(Not(suspect.is_innocent))
 
@@ -242,66 +242,49 @@ class Puzzle:
         match clue.split():
             # TODO - does this need to have "is" | "are"?
             # TODO - version of this for rows
-            case ["Exactly", num_suspects, ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "in", "column", column_name, "is", "neighboring", suspect_name]:
+            case ["Exactly", num_suspects, ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict_str, "in", "column", column_name, "is", "neighboring", suspect_name]:
                 column_suspects = self.column(Column.parse(column_name))
                 neighbors = self.suspects[suspect_name].neighbors
                 neighbor_subset = column_suspects & neighbors
+                verdict = Verdict.parse(verdict_str)
 
-                if verdict == 'innocent' or 'innocents':
-                    self.set_has_exactly_n_innocents(
-                        neighbor_subset, int(num_suspects))
-                elif verdict == 'criminal' or 'criminals':
-                    self.set_has_exactly_n_criminals(
-                        neighbor_subset, int(num_suspects))
+                self.set_has_exactly_n_of_verdict(
+                    neighbor_subset, int(num_suspects), verdict)
 
             # TODO - case for above/below as well as left/right
-            case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "to", "the", ("left" | "right") as direction_name, "of", suspect_name]:
+            case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict_str, "to", "the", ("left" | "right") as direction_name, "of", suspect_name]:
                 direction = Direction(direction_name)
                 parity = Parity(parity_str)
+                verdict = Verdict.parse(verdict_str)
                 neighbor_subset = self.get_suspects_relative_to_other_suspect(
                     suspect_name, direction)
 
-                if verdict == 'innocent' or 'innocents':
-                    self.set_has_parity(neighbor_subset, parity, True)
-                elif verdict == 'criminal' or 'criminals':
-                    self.set_has_parity(neighbor_subset, parity, False)
+                self.set_has_parity(neighbor_subset, parity, verdict)
 
             # TODO - case for to the left/right of as well as above/below
-            case ["There", "is", "only", "one", ('innocent' | 'criminal') as verdict, ("above" | "below") as direction_name, suspect_name]:
+            case ["There", "is", "only", "one", ('innocent' | 'criminal') as verdict_str, ("above" | "below") as direction_name, suspect_name]:
                 direction = Direction(direction_name)
                 neighbor_subset = self.get_suspects_relative_to_other_suspect(
                     suspect_name, direction)
+                verdict = Verdict.parse(verdict_str)
 
-                if verdict == "innocent":
-                    self.set_has_exactly_n_innocents(neighbor_subset, 1)
-                elif verdict == "criminal":
-                    self.set_has_exactly_n_criminals(neighbor_subset, 1)
+                self.set_has_exactly_n_of_verdict(neighbor_subset, 1, verdict)
 
-            # TODO - version of this for rows
-            case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict, "in", "column", column_name]:
+            case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict_str, "in", "column", column_name]:
                 neighbor_subset = self.column(Column.parse(column_name))
+                verdict = Verdict.parse(verdict_str)
 
-                if verdict == "innocents":
-                    self.set_single_verdict(suspect_name, True)
-                    self.set_has_exactly_n_innocents(
-                        neighbor_subset, int(num_suspects))
-                elif verdict == "criminals":
-                    self.set_single_verdict(suspect_name, False)
-                    self.set_has_exactly_n_criminals(
-                        neighbor_subset, int(num_suspects))
+                self.set_single_verdict(suspect_name, verdict)
+                self.set_has_exactly_n_of_verdict(
+                    neighbor_subset, int(num_suspects), verdict)
 
-            # TODO - version of this for columns
-            case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminals") as verdict, "in", "row", row]:
+            case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminals") as verdict_str, "in", "row", row]:
                 neighbor_subset = self.row(int(row))
+                verdict = Verdict.parse(verdict_str)
 
-                if verdict == "innocents":
-                    self.set_single_verdict(suspect_name, True)
-                    self.set_has_exactly_n_innocents(
-                        neighbor_subset, int(num_suspects))
-                elif verdict == "criminals":
-                    self.set_single_verdict(suspect_name, False)
-                    self.set_has_exactly_n_criminals(
-                        neighbor_subset, int(num_suspects))
+                self.set_single_verdict(suspect_name, verdict)
+                self.set_has_exactly_n_of_verdict(
+                    neighbor_subset, int(num_suspects), verdict)
 
             case ["There", "are", "as", "many", "innocent", profession1_plural, "as", "there", "are", "innocent", profession2_plural]:
                 profession1 = profession1_plural.removesuffix("s")
@@ -324,7 +307,7 @@ class Puzzle:
                 self.solver.add(profession1_count == profession2_count)
 
             # TODO - double-check wording for cases where this refers to multiple suspects - is the "have" actually needed?
-            case ["Exactly", num_suspects, profession_plural, ("has" | "have"), "a", ("innocent" | "criminal") as verdict, "directly", ("above" | "below") as direction_name, "them"]:
+            case ["Exactly", num_suspects, profession_plural, ("has" | "have"), "a", ("innocent" | "criminal") as verdict_str, "directly", ("above" | "below") as direction_name, "them"]:
                 profession = profession_plural.removesuffix("s")
                 profession_members = self.all_of_profession(profession)
                 direction = Direction(direction_name)
@@ -333,56 +316,54 @@ class Puzzle:
                 filtered_neighbors = [
                     n for n in profession_neighbors if n is not None]
 
-                if verdict == "innocent":
+                if verdict_str == "innocent":
                     self.set_has_exactly_n_innocents(
                         set(filtered_neighbors), int(num_suspects))
-                elif verdict == "criminal":
+                elif verdict_str == "criminal":
                     self.set_has_exactly_n_criminals(
                         set(filtered_neighbors), int(num_suspects))
 
             # TODO - what's the exact wording for "to the left of/to the right of"? does that case happen?
-            case ["Exactly", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict, "neighboring", central_suspect, "are", ("above" | "below") as direction_name, other_suspect]:
+            case ["Exactly", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict_str, "neighboring", central_suspect, "are", ("above" | "below") as direction_name, other_suspect]:
                 # first part - central_suspect has num_neighbors with verdict
                 central_suspect_neighbors = self.suspects[central_suspect].neighbors
+                verdict = Verdict.parse(verdict_str)
 
-                if verdict == "innocents":
-                    self.set_has_exactly_n_innocents(
-                        central_suspect_neighbors, int(num_neighbors))
-                elif verdict == "criminals":
-                    self.set_has_exactly_n_criminals(
-                        central_suspect_neighbors, int(num_neighbors))
+                self.set_has_exactly_n_of_verdict(
+                    central_suspect_neighbors, int(num_neighbors), verdict)
 
                 # second part - of those neighbors, num_neighbor_subset in direction_name relative to other_suspect, have verdict
                 direction = Direction(direction_name)
                 neighbor_subset = central_suspect_neighbors & self.get_suspects_relative_to_other_suspect(
                     other_suspect, direction)
 
-                if verdict == "innocents":
-                    self.set_has_exactly_n_innocents(
-                        neighbor_subset, int(num_neighbor_subset))
-                elif verdict == "criminals":
-                    self.set_has_exactly_n_criminals(
-                        neighbor_subset, int(num_neighbor_subset))
+                self.set_has_exactly_n_of_verdict(
+                    neighbor_subset, int(num_neighbor_subset), verdict)
 
             # TODO - version of this for columns
-            case ["An", ("odd" | "even") as parity_str, "number", "of", ('innocents' | 'criminals') as verdict, "in", "row", row, "neighbor", suspect_name]:
+            case ["An", ("odd" | "even") as parity_str, "number", "of", ('innocents' | 'criminals') as verdict_str, "in", "row", row, "neighbor", suspect_name]:
                 neighbors = self.suspects[suspect_name].neighbors
                 row_suspects = self.row(int(row))
                 relevant_suspects = neighbors & row_suspects
                 parity = Parity(parity_str)
+                verdict = Verdict.parse(verdict_str)
 
-                if verdict == 'innocents':
-                    self.set_has_parity(relevant_suspects, parity, True)
-                elif verdict == 'criminals':
-                    self.set_has_parity(relevant_suspects, parity, False)
+                self.set_has_parity(relevant_suspects, parity, verdict)
 
             # TODO - version of this for rows
-            case ["Column", column_name, "has", "more", ("innocents" | "criminals") as verdict, "than", "any", "other", "column"]:
+            case ["Column", column_name, "has", "more", ("innocents" | "criminals") as verdict_str, "than", "any", "other", "column"]:
                 self.column_has_most_of_verdict(
-                    Column.parse(column_name), Verdict.parse(verdict))
+                    Column.parse(column_name), Verdict.parse(verdict_str))
 
-    # TODO - condense this and set_has_exactly_n_criminals into one method with an is_innocent parameter?
-    # TODO - maybe an enum for Innocent/Criminal?
+    def set_has_exactly_n_of_verdict(self, suspects: set[Suspect], num_of_verdict: int, verdict: Verdict):
+        if verdict == Verdict.INNOCENT:
+            refs = [suspect.is_innocent for suspect in suspects]
+        elif verdict == Verdict.CRIMINAL:
+            refs = [Not(suspect.is_innocent) for suspect in suspects]
+
+        self.solver.add(AtLeast(*refs, num_of_verdict))
+        self.solver.add(AtMost(*refs, num_of_verdict))
+
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
         refs = [suspect.is_innocent for suspect in suspects]
         self.solver.add(AtLeast(*refs, num_innocents))
@@ -393,15 +374,15 @@ class Puzzle:
         self.solver.add(AtLeast(*refs, num_criminals))
         self.solver.add(AtMost(*refs, num_criminals))
 
-    def set_has_parity(self, suspects: set[Suspect], parity: Parity, is_innocent: bool):
-        match is_innocent, parity:
-            case True, Parity.ODD:
+    def set_has_parity(self, suspects: set[Suspect], parity: Parity, verdict: Verdict):
+        match verdict, parity:
+            case Verdict.INNOCENT, Parity.ODD:
                 self.solver.add(count_innocents(suspects) % 2 == 1)
-            case True, Parity.EVEN:
+            case Verdict.INNOCENT, Parity.EVEN:
                 self.solver.add(count_innocents(suspects) % 2 == 0)
-            case False, Parity.ODD:
+            case Verdict.CRIMINAL, Parity.ODD:
                 self.solver.add(count_criminals(suspects) % 2 == 1)
-            case False, Parity.EVEN:
+            case Verdict.CRIMINAL, Parity.EVEN:
                 self.solver.add(count_criminals(suspects) % 2 == 0)
 
     def column_has_most_of_verdict(self, column: Column, verdict: Verdict):
@@ -427,6 +408,7 @@ def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     return sorted(suspects, key=lambda suspect: suspect.name)
 
 
+# TODO - condense this and count_criminals() into one function that takes a verdict parameter
 def count_innocents(suspects: set[Suspect]):
     return Sum([If(s.is_innocent, 1, 0) for s in suspects])
 
@@ -445,7 +427,7 @@ def main():
     puzzle = Puzzle(input_data)
 
     # initial uncovered suspect
-    puzzle.set_single_verdict("Frank", True)
+    puzzle.set_single_verdict("Frank", Verdict.INNOCENT)
 
     # first clue, from Frank
     puzzle.handle_clue("Exactly 1 innocent in column A is neighboring Megan")
@@ -572,7 +554,7 @@ def main():
     print()
 
     # fourteenth clue, from Julie - "Terry is one of two or more innocents on the edges"
-    puzzle.set_single_verdict("Terry", True)
+    puzzle.set_single_verdict("Terry", Verdict.INNOCENT)
 
     edge_refs = [s.is_innocent for s in puzzle.edges()]
     puzzle.solver.add(AtLeast(*edge_refs, 2))

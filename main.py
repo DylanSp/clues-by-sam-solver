@@ -342,7 +342,19 @@ class Puzzle:
                 elif verdict == "criminals":
                     self.set_has_exactly_n_criminals(
                         neighbor_subset, int(num_neighbor_subset))
+            case ["An", ("odd" | "even") as parity_str, "number", "of", ('innocents' | 'criminals') as verdict, "in", "row", row, "neighbor", suspect_name]:
+                neighbors = self.suspects[suspect_name].neighbors
+                row_suspects = self.row(int(row))
+                relevant_suspects = neighbors & row_suspects
+                parity = Parity(parity_str)
 
+                if verdict == 'innocents':
+                    self.set_has_parity(relevant_suspects, parity, True)
+                elif verdict == 'criminals':
+                    self.set_has_parity(relevant_suspects, parity, False)
+
+    # TODO - condense this and set_has_exactly_n_criminals into one method with an is_innocent parameter?
+    # TODO - maybe an enum for Innocent/Criminal?
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
         refs = [suspect.is_innocent for suspect in suspects]
         self.solver.add(AtLeast(*refs, num_innocents))
@@ -488,15 +500,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # tenth clue, from Wally - "An odd number of innocents in row 1 neighbor Helen"
-    clue10_refs = [s.is_innocent for s in puzzle.row(
-        1).intersection(puzzle.suspects["Helen"].neighbors)]
-    puzzle.solver.add(Or(
-        And(AtLeast(*clue10_refs, 1), AtMost(*clue10_refs, 1)),
-        And(AtLeast(*clue10_refs, 3), AtMost(*clue10_refs, 3)),
-        And(AtLeast(*clue10_refs, 5), AtMost(*clue10_refs, 5))
-    ))
-
+    # tenth clue, from Wally
+    puzzle.handle_clue("An odd number of innocents in row 1 neighbor Helen")
     puzzle.solve_many()
     print()
 

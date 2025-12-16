@@ -8,10 +8,19 @@ NUM_ROWS = 5
 NUM_COLS = 4
 
 
-class Verdict(Enum):
+class Verdict(IntEnum):
     INNOCENT = 1
     CRIMINAL = 2
-    UNKNOWN = 3
+
+    @classmethod
+    def parse(cls, input: str) -> "Verdict":
+        match input:
+            case "innocent" | "innocents":
+                return Verdict.INNOCENT
+            case "criminal" | "criminals":
+                return Verdict.CRIMINAL
+
+        raise ValueError(f"{input} is not a valid verdict")
 
 
 # IntEnum so we can set column numerically when setting up the grid of suspects

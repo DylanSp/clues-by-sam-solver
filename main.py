@@ -376,6 +376,11 @@ class Puzzle:
                 elif verdict == 'criminals':
                     self.set_has_parity(relevant_suspects, parity, False)
 
+            # TODO - version of this for rows
+            case ["Column", column_name, "has", "more", ("innocents" | "criminals") as verdict, "than", "any", "other", "column"]:
+                self.column_has_most_of_verdict(
+                    Column.parse(column_name), Verdict.parse(verdict))
+
     # TODO - condense this and set_has_exactly_n_criminals into one method with an is_innocent parameter?
     # TODO - maybe an enum for Innocent/Criminal?
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
@@ -398,6 +403,20 @@ class Puzzle:
                 self.solver.add(count_criminals(suspects) % 2 == 1)
             case False, Parity.EVEN:
                 self.solver.add(count_criminals(suspects) % 2 == 0)
+
+    def column_has_most_of_verdict(self, column: Column, verdict: Verdict):
+        for other_col in Column:
+            if other_col != column:
+                if verdict == Verdict.INNOCENT:
+                    self.solver.add(
+                        count_innocents(self.column(column)) > count_innocents(
+                            self.column(other_col))
+                    )
+                elif verdict == Verdict.CRIMINAL:
+                    self.solver.add(
+                        count_criminals(self.column(column)) > count_criminals(
+                            self.column(other_col))
+                    )
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
@@ -528,21 +547,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # eleventh clue, from Bonnie - "Column C has more innocents than any other column"
-
-    colA_count = Sum([If(s.is_innocent, 1, 0)
-                     for s in puzzle.column(Column.A)])
-    colB_count = Sum([If(s.is_innocent, 1, 0)
-                     for s in puzzle.column(Column.B)])
-    colC_count = Sum([If(s.is_innocent, 1, 0)
-                     for s in puzzle.column(Column.C)])
-    colD_count = Sum([If(s.is_innocent, 1, 0)
-                     for s in puzzle.column(Column.D)])
-
-    puzzle.solver.add(colC_count > colA_count)
-    puzzle.solver.add(colC_count > colB_count)
-    puzzle.solver.add(colC_count > colD_count)
-
+    # eleventh clue, from Bonnie
+    puzzle.handle_clue("Column C has more innocents than any other column")
     puzzle.solve_many()
     print()
 

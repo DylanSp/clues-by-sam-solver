@@ -272,7 +272,7 @@ class Puzzle:
                     self.set_single_verdict(suspect_name, False)
                     self.set_has_exactly_n_criminals(
                         relevant_suspects, int(num_suspects))
-            case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict, "in", "row", row]:
+            case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminals") as verdict, "in", "row", row]:
                 relevant_suspects = self.row(int(row))
 
                 if verdict == "innocents":
@@ -301,6 +301,21 @@ class Puzzle:
                     self.all_of_profession(profession2))
 
                 self.solver.add(profession1_count == profession2_count)
+            case ["Exactly", num_suspects, profession_plural, ("has" | "have"), "a", ("innocent" | "criminal") as verdict, "directly", ("above" | "below") as direction_name, "them"]:
+                profession = profession_plural.removesuffix("s")
+                profession_members = self.all_of_profession(profession)
+                direction = Direction(direction_name)
+                profession_neighbors = [p.neighbor_in_direction(
+                    direction) for p in profession_members]
+                filtered_neighbors = [
+                    n for n in profession_neighbors if n is not None]
+
+                if verdict == "innocent":
+                    self.set_has_exactly_n_innocents(
+                        set(filtered_neighbors), int(num_suspects))
+                elif verdict == "criminal":
+                    self.set_has_exactly_n_criminals(
+                        set(filtered_neighbors), int(num_suspects))
 
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
         refs = [suspect.is_innocent for suspect in suspects]
@@ -417,15 +432,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # seventh clue, from Chris - "Exactly 1 guard has a criminal directly below them"
-    guards = puzzle.all_of_profession("guard")
-    guard_neighbors = [g.neighbor_in_direction(
-        Direction.BELOW) for g in guards]
-    filtered_guard_neighbor_refs = [
-        Not(n.is_innocent) for n in guard_neighbors if n is not None]
-    puzzle.solver.add(AtLeast(*filtered_guard_neighbor_refs, 1))
-    puzzle.solver.add(AtMost(*filtered_guard_neighbor_refs, 1))
-
+    # seventh clue, from Chris
+    puzzle.handle_clue("Exactly 1 guard has a criminal directly below them")
     puzzle.solve_many()
     print()
 

@@ -231,6 +231,8 @@ class Puzzle:
 
     def handle_clue(self, clue: str):
         match clue.split():
+            # TODO - does this need to have "is" | "are"?
+            # TODO - version of this for rows
             case ["Exactly", num_suspects, ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "in", "column", column_name, "is", "neighboring", suspect_name]:
                 column_suspects = self.column(Column.parse(column_name))
                 neighbors = self.suspects[suspect_name].neighbors
@@ -242,6 +244,7 @@ class Puzzle:
                 elif verdict == 'criminal' or 'criminals':
                     self.set_has_exactly_n_criminals(
                         neighbor_subset, int(num_suspects))
+
             # TODO - case for above/below as well as left/right
             case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "to", "the", ("left" | "right") as direction_name, "of", suspect_name]:
                 direction = Direction(direction_name)
@@ -253,6 +256,7 @@ class Puzzle:
                     self.set_has_parity(neighbor_subset, parity, True)
                 elif verdict == 'criminal' or 'criminals':
                     self.set_has_parity(neighbor_subset, parity, False)
+
             # TODO - case for to the left/right of as well as above/below
             case ["There", "is", "only", "one", ('innocent' | 'criminal') as verdict, ("above" | "below") as direction_name, suspect_name]:
                 direction = Direction(direction_name)
@@ -263,6 +267,8 @@ class Puzzle:
                     self.set_has_exactly_n_innocents(neighbor_subset, 1)
                 elif verdict == "criminal":
                     self.set_has_exactly_n_criminals(neighbor_subset, 1)
+
+            # TODO - version of this for rows
             case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict, "in", "column", column_name]:
                 neighbor_subset = self.column(Column.parse(column_name))
 
@@ -274,6 +280,8 @@ class Puzzle:
                     self.set_single_verdict(suspect_name, False)
                     self.set_has_exactly_n_criminals(
                         neighbor_subset, int(num_suspects))
+
+            # TODO - version of this for columns
             case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminals") as verdict, "in", "row", row]:
                 neighbor_subset = self.row(int(row))
 
@@ -285,6 +293,7 @@ class Puzzle:
                     self.set_single_verdict(suspect_name, False)
                     self.set_has_exactly_n_criminals(
                         neighbor_subset, int(num_suspects))
+
             case ["There", "are", "as", "many", "innocent", profession1_plural, "as", "there", "are", "innocent", profession2_plural]:
                 profession1 = profession1_plural.removesuffix("s")
                 profession2 = profession2_plural.removesuffix("s")
@@ -294,6 +303,7 @@ class Puzzle:
                     self.all_of_profession(profession2))
 
                 self.solver.add(profession1_count == profession2_count)
+
             case ["There", "are", "as", "many", "criminal", profession1_plural, "as", "there", "are", "criminal", profession2_plural]:
                 profession1 = profession1_plural.removesuffix("s")
                 profession2 = profession2_plural.removesuffix("s")
@@ -303,6 +313,7 @@ class Puzzle:
                     self.all_of_profession(profession2))
 
                 self.solver.add(profession1_count == profession2_count)
+
             # TODO - double-check wording for cases where this refers to multiple suspects - is the "have" actually needed?
             case ["Exactly", num_suspects, profession_plural, ("has" | "have"), "a", ("innocent" | "criminal") as verdict, "directly", ("above" | "below") as direction_name, "them"]:
                 profession = profession_plural.removesuffix("s")
@@ -319,6 +330,7 @@ class Puzzle:
                 elif verdict == "criminal":
                     self.set_has_exactly_n_criminals(
                         set(filtered_neighbors), int(num_suspects))
+
             # TODO - what's the exact wording for "to the left of/to the right of"? does that case happen?
             case ["Exactly", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict, "neighboring", central_suspect, "are", ("above" | "below") as direction_name, other_suspect]:
                 # first part - central_suspect has num_neighbors with verdict
@@ -342,6 +354,8 @@ class Puzzle:
                 elif verdict == "criminals":
                     self.set_has_exactly_n_criminals(
                         neighbor_subset, int(num_neighbor_subset))
+
+            # TODO - version of this for columns
             case ["An", ("odd" | "even") as parity_str, "number", "of", ('innocents' | 'criminals') as verdict, "in", "row", row, "neighbor", suspect_name]:
                 neighbors = self.suspects[suspect_name].neighbors
                 row_suspects = self.row(int(row))

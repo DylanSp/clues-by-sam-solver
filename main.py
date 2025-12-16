@@ -234,55 +234,57 @@ class Puzzle:
             case ["Exactly", num_suspects, ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "in", "column", column_name, "is", "neighboring", suspect_name]:
                 column_suspects = self.column(Column.parse(column_name))
                 neighbors = self.suspects[suspect_name].neighbors
-                relevant_suspects = column_suspects & neighbors
+                neighbor_subset = column_suspects & neighbors
 
                 if verdict == 'innocent' or 'innocents':
                     self.set_has_exactly_n_innocents(
-                        relevant_suspects, int(num_suspects))
+                        neighbor_subset, int(num_suspects))
                 elif verdict == 'criminal' or 'criminals':
                     self.set_has_exactly_n_criminals(
-                        relevant_suspects, int(num_suspects))
+                        neighbor_subset, int(num_suspects))
+            # TODO - case for above/below as well as left/right
             case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict, "to", "the", ("left" | "right") as direction_name, "of", suspect_name]:
                 direction = Direction(direction_name)
                 parity = Parity(parity_str)
-                relevant_suspects = self.get_suspects_relative_to_other_suspect(
+                neighbor_subset = self.get_suspects_relative_to_other_suspect(
                     suspect_name, direction)
 
                 if verdict == 'innocent' or 'innocents':
-                    self.set_has_parity(relevant_suspects, parity, True)
+                    self.set_has_parity(neighbor_subset, parity, True)
                 elif verdict == 'criminal' or 'criminals':
-                    self.set_has_parity(relevant_suspects, parity, False)
+                    self.set_has_parity(neighbor_subset, parity, False)
+            # TODO - case for to the left/right of as well as above/below
             case ["There", "is", "only", "one", ('innocent' | 'criminal') as verdict, ("above" | "below") as direction_name, suspect_name]:
                 direction = Direction(direction_name)
-                relevant_suspects = self.get_suspects_relative_to_other_suspect(
+                neighbor_subset = self.get_suspects_relative_to_other_suspect(
                     suspect_name, direction)
 
                 if verdict == "innocent":
-                    self.set_has_exactly_n_innocents(relevant_suspects, 1)
+                    self.set_has_exactly_n_innocents(neighbor_subset, 1)
                 elif verdict == "criminal":
-                    self.set_has_exactly_n_criminals(relevant_suspects, 1)
+                    self.set_has_exactly_n_criminals(neighbor_subset, 1)
             case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminal") as verdict, "in", "column", column_name]:
-                relevant_suspects = self.column(Column.parse(column_name))
+                neighbor_subset = self.column(Column.parse(column_name))
 
                 if verdict == "innocents":
                     self.set_single_verdict(suspect_name, True)
                     self.set_has_exactly_n_innocents(
-                        relevant_suspects, int(num_suspects))
+                        neighbor_subset, int(num_suspects))
                 elif verdict == "criminals":
                     self.set_single_verdict(suspect_name, False)
                     self.set_has_exactly_n_criminals(
-                        relevant_suspects, int(num_suspects))
+                        neighbor_subset, int(num_suspects))
             case [suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminals") as verdict, "in", "row", row]:
-                relevant_suspects = self.row(int(row))
+                neighbor_subset = self.row(int(row))
 
                 if verdict == "innocents":
                     self.set_single_verdict(suspect_name, True)
                     self.set_has_exactly_n_innocents(
-                        relevant_suspects, int(num_suspects))
+                        neighbor_subset, int(num_suspects))
                 elif verdict == "criminals":
                     self.set_single_verdict(suspect_name, False)
                     self.set_has_exactly_n_criminals(
-                        relevant_suspects, int(num_suspects))
+                        neighbor_subset, int(num_suspects))
             case ["There", "are", "as", "many", "innocent", profession1_plural, "as", "there", "are", "innocent", profession2_plural]:
                 profession1 = profession1_plural.removesuffix("s")
                 profession2 = profession2_plural.removesuffix("s")
@@ -301,6 +303,7 @@ class Puzzle:
                     self.all_of_profession(profession2))
 
                 self.solver.add(profession1_count == profession2_count)
+            # TODO - double-check wording for cases where this refers to multiple suspects - is the "have" actually needed?
             case ["Exactly", num_suspects, profession_plural, ("has" | "have"), "a", ("innocent" | "criminal") as verdict, "directly", ("above" | "below") as direction_name, "them"]:
                 profession = profession_plural.removesuffix("s")
                 profession_members = self.all_of_profession(profession)
@@ -316,6 +319,29 @@ class Puzzle:
                 elif verdict == "criminal":
                     self.set_has_exactly_n_criminals(
                         set(filtered_neighbors), int(num_suspects))
+            # TODO - what's the exact wording for "to the left of/to the right of"? does that case happen?
+            case ["Exactly", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict, "neighboring", central_suspect, "are", ("above" | "below") as direction_name, other_suspect]:
+                # first part - central_suspect has num_neighbors with verdict
+                central_suspect_neighbors = self.suspects[central_suspect].neighbors
+
+                if verdict == "innocents":
+                    self.set_has_exactly_n_innocents(
+                        central_suspect_neighbors, int(num_neighbors))
+                elif verdict == "criminals":
+                    self.set_has_exactly_n_criminals(
+                        central_suspect_neighbors, int(num_neighbors))
+
+                # second part - of those neighbors, num_neighbor_subset in direction_name relative to other_suspect, have verdict
+                direction = Direction(direction_name)
+                neighbor_subset = central_suspect_neighbors & self.get_suspects_relative_to_other_suspect(
+                    other_suspect, direction)
+
+                if verdict == "innocents":
+                    self.set_has_exactly_n_innocents(
+                        neighbor_subset, int(num_neighbor_subset))
+                elif verdict == "criminals":
+                    self.set_has_exactly_n_criminals(
+                        neighbor_subset, int(num_neighbor_subset))
 
     def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
         refs = [suspect.is_innocent for suspect in suspects]
@@ -437,22 +463,9 @@ def main():
     puzzle.solve_many()
     print()
 
-    # eighth clue, from Isaac - "Exactly 2 of the 3 criminals neighboring Megan are above Vicky"
-
-    # Megan has 3 criminal neighbors
-    megan_neighbor_refs = [Not(n.is_innocent)
-                           for n in puzzle.suspects["Megan"].neighbors]
-    puzzle.solver.add(AtLeast(*megan_neighbor_refs, 3))
-    puzzle.solver.add(AtMost(*megan_neighbor_refs, 3))
-
-    # 2 criminals above Vicky, neighboring Megan, are criminal
-    above_vicky = puzzle.get_suspects_relative_to_other_suspect(
-        "Vicky", Direction.ABOVE)
-    clue8_part2_refs = [Not(s.is_innocent) for s in above_vicky.intersection(
-        puzzle.suspects["Megan"].neighbors)]
-    puzzle.solver.add(AtLeast(*clue8_part2_refs, 2))
-    puzzle.solver.add(AtMost(*clue8_part2_refs, 2))
-
+    # eighth clue, from Isaac
+    puzzle.handle_clue(
+        "Exactly 2 of the 3 criminals neighboring Megan are above Vicky")
     puzzle.solve_many()
     print()
 

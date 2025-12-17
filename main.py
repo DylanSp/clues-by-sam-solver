@@ -286,22 +286,12 @@ class Puzzle:
                 self.set_has_exactly_n_of_verdict(
                     neighbor_subset, int(num_suspects), verdict)
 
-            case ["There", "are", "as", "many", "innocent", profession1_plural, "as", "there", "are", "innocent", profession2_plural]:
+            case ["There", "are", "as", "many", ("innocent" | "criminal") as verdict_str1, profession1_plural, "as", "there", "are", ("innocent" | "criminal") as verdict_str2, profession2_plural] if verdict_str1 == verdict_str2:
                 profession1 = profession1_plural.removesuffix("s")
                 profession2 = profession2_plural.removesuffix("s")
                 profession1_count = count_innocents(
                     self.all_of_profession(profession1))
                 profession2_count = count_innocents(
-                    self.all_of_profession(profession2))
-
-                self.solver.add(profession1_count == profession2_count)
-
-            case ["There", "are", "as", "many", "criminal", profession1_plural, "as", "there", "are", "criminal", profession2_plural]:
-                profession1 = profession1_plural.removesuffix("s")
-                profession2 = profession2_plural.removesuffix("s")
-                profession1_count = count_criminals(
-                    self.all_of_profession(profession1))
-                profession2_count = count_criminals(
                     self.all_of_profession(profession2))
 
                 self.solver.add(profession1_count == profession2_count)

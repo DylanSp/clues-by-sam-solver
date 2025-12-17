@@ -345,6 +345,18 @@ class Puzzle:
                 self.column_has_most_of_verdict(
                     Column.parse(column_name), Verdict.parse(verdict_str))
 
+            # TODO - version of this for columns
+            case ["There", "are", "more", ("innocents" | "criminals") as more_verdict, "than", ("innocents" | "criminals") as less_verdict, "in", "row", row] if more_verdict != less_verdict:
+                row_suspects = self.row(int(row))
+                innocent_count = count_innocents(row_suspects)
+                criminal_count = count_criminals(row_suspects)
+
+                match more_verdict, less_verdict:
+                    case "innocents", "criminals":
+                        self.solver.add(innocent_count > criminal_count)
+                    case "criminals", "innocents":
+                        self.solver.add(criminal_count > innocent_count)
+
     def set_has_exactly_n_of_verdict(self, suspects: set[Suspect], num_of_verdict: int, verdict: Verdict):
         if verdict == Verdict.INNOCENT:
             refs = [suspect.is_innocent for suspect in suspects]
@@ -524,12 +536,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # twelfth clue, from Megan - "there are more criminals than innocents in row 1"
-    row1_innocent_count = Sum([If(s.is_innocent, 1, 0) for s in puzzle.row(1)])
-    row1_criminal_count = Sum([If(Not(s.is_innocent), 1, 0)
-                              for s in puzzle.row(1)])
-    puzzle.solver.add(row1_criminal_count > row1_innocent_count)
-
+    # twelfth clue, from Megan
+    puzzle.handle_clue("there are more criminals than innocents in row 1")
     puzzle.solve_many()
     print()
 

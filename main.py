@@ -7,6 +7,13 @@ from z3 import Int, Solver, sat, Or, And, Not, If, Bool, Bools, ArithRef, BoolRe
 NUM_ROWS = 5
 NUM_COLS = 4
 
+word_to_int: dict[str, int] = {
+    "one": 1,
+    "two": 2,
+    "three": 3
+    # TODO - fill out as needed
+}
+
 
 class Verdict(IntEnum):
     INNOCENT = 1
@@ -286,6 +293,15 @@ class Puzzle:
                 self.set_has_exactly_n_of_verdict(
                     neighbor_subset, int(num_suspects), verdict)
 
+            case [suspect_name, "is", "one", "of", num_suspects_str, "or", "more", ("innocents" | "criminals") as verdict_str, "on", "the", "edges"]:
+                verdict = Verdict.parse(verdict_str)
+                num_suspects = word_to_int[num_suspects_str]
+                relevant_edge_suspects_count = count_suspects_with_verdict(
+                    self.edges(), verdict)
+
+                self.set_single_verdict(suspect_name, verdict)
+                self.solver.add(relevant_edge_suspects_count >= num_suspects)
+
             case ["There", "are", "as", "many", ("innocent" | "criminal") as verdict_str1, profession1_plural, "as", "there", "are", ("innocent" | "criminal") as verdict_str2, profession2_plural] if verdict_str1 == verdict_str2:
                 profession1 = profession1_plural.removesuffix("s")
                 profession2 = profession2_plural.removesuffix("s")
@@ -552,12 +568,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # fourteenth clue, from Julie - "Terry is one of two or more innocents on the edges"
-    puzzle.set_single_verdict("Terry", Verdict.INNOCENT)
-
-    edge_refs = [s.is_innocent for s in puzzle.edges()]
-    puzzle.solver.add(AtLeast(*edge_refs, 2))
-
+    # fourteenth clue, from Julie
+    puzzle.handle_clue("Terry is one of two or more innocents on the edges")
     puzzle.solve_many()
     print()
 

@@ -289,10 +289,12 @@ class Puzzle:
             case ["There", "are", "as", "many", ("innocent" | "criminal") as verdict_str1, profession1_plural, "as", "there", "are", ("innocent" | "criminal") as verdict_str2, profession2_plural] if verdict_str1 == verdict_str2:
                 profession1 = profession1_plural.removesuffix("s")
                 profession2 = profession2_plural.removesuffix("s")
-                profession1_count = count_innocents(
-                    self.all_of_profession(profession1))
-                profession2_count = count_innocents(
-                    self.all_of_profession(profession2))
+                verdict = Verdict.parse(verdict_str1)
+
+                profession1_count = count_suspects_with_verdict(
+                    self.all_of_profession(profession1), verdict)
+                profession2_count = count_suspects_with_verdict(
+                    self.all_of_profession(profession2), verdict)
 
                 self.solver.add(profession1_count == profession2_count)
 
@@ -348,8 +350,10 @@ class Puzzle:
             # TODO - version of this for columns
             case ["There", "are", "more", ("innocents" | "criminals") as more_verdict, "than", ("innocents" | "criminals") as less_verdict, "in", "row", row] if more_verdict != less_verdict:
                 row_suspects = self.row(int(row))
-                innocent_count = count_innocents(row_suspects)
-                criminal_count = count_criminals(row_suspects)
+                innocent_count = count_suspects_with_verdict(
+                    row_suspects, Verdict.INNOCENT)
+                criminal_count = count_suspects_with_verdict(
+                    row_suspects, Verdict.CRIMINAL)
 
                 match more_verdict, less_verdict:
                     case "innocents", "criminals":
@@ -389,29 +393,21 @@ class Puzzle:
         self.solver.add(AtMost(*refs, num_criminals))
 
     def set_has_parity(self, suspects: set[Suspect], parity: Parity, verdict: Verdict):
-        match verdict, parity:
-            case Verdict.INNOCENT, Parity.ODD:
-                self.solver.add(count_innocents(suspects) % 2 == 1)
-            case Verdict.INNOCENT, Parity.EVEN:
-                self.solver.add(count_innocents(suspects) % 2 == 0)
-            case Verdict.CRIMINAL, Parity.ODD:
-                self.solver.add(count_criminals(suspects) % 2 == 1)
-            case Verdict.CRIMINAL, Parity.EVEN:
-                self.solver.add(count_criminals(suspects) % 2 == 0)
+        count = count_suspects_with_verdict(suspects, verdict)
+        if parity == Parity.ODD:
+            self.solver.add(count % 2 == 1)
+        elif parity == Parity.EVEN:
+            self.solver.add(count % 2 == 0)
 
     def column_has_most_of_verdict(self, column: Column, verdict: Verdict):
+        column_count = count_suspects_with_verdict(
+            self.column(column), verdict)
+
         for other_col in Column:
             if other_col != column:
-                if verdict == Verdict.INNOCENT:
-                    self.solver.add(
-                        count_innocents(self.column(column)) > count_innocents(
-                            self.column(other_col))
-                    )
-                elif verdict == Verdict.CRIMINAL:
-                    self.solver.add(
-                        count_criminals(self.column(column)) > count_criminals(
-                            self.column(other_col))
-                    )
+                other_col_count = count_suspects_with_verdict(
+                    self.column(other_col), verdict)
+                self.solver.add(column_count > other_col_count)
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
@@ -420,15 +416,6 @@ def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
     assert len({s.column for s in suspects}) == 1
 
     return sorted(suspects, key=lambda suspect: suspect.name)
-
-
-# TODO - condense this and count_criminals() into one function that takes a verdict parameter
-def count_innocents(suspects: set[Suspect]):
-    return Sum([If(s.is_innocent, 1, 0) for s in suspects])
-
-
-def count_criminals(suspects: set[Suspect]):
-    return Sum([If(s.is_innocent, 0, 1) for s in suspects])
 
 
 def count_suspects_with_verdict(suspects: set[Suspect], verdict: Verdict):

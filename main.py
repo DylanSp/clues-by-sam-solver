@@ -357,6 +357,18 @@ class Puzzle:
                     case "criminals", "innocents":
                         self.solver.add(criminal_count > innocent_count)
 
+            case [more_suspect_name, "has", "more", ("innocent" | "criminal") as verdict_str, "neighbors", "than", less_suspect_name]:
+                verdict = Verdict.parse(verdict_str)
+                more_suspect_neighbors = self.suspects[more_suspect_name].neighbors
+                more_suspect_neighbor_count = count_suspects_with_verdict(
+                    more_suspect_neighbors, verdict)
+                less_suspect_neighbors = self.suspects[less_suspect_name].neighbors
+                less_suspect_neighbor_count = count_suspects_with_verdict(
+                    less_suspect_neighbors, verdict)
+
+                self.solver.add(more_suspect_neighbor_count >
+                                less_suspect_neighbor_count)
+
     def set_has_exactly_n_of_verdict(self, suspects: set[Suspect], num_of_verdict: int, verdict: Verdict):
         if verdict == Verdict.INNOCENT:
             refs = [suspect.is_innocent for suspect in suspects]
@@ -417,6 +429,13 @@ def count_innocents(suspects: set[Suspect]):
 
 def count_criminals(suspects: set[Suspect]):
     return Sum([If(s.is_innocent, 0, 1) for s in suspects])
+
+
+def count_suspects_with_verdict(suspects: set[Suspect], verdict: Verdict):
+    if verdict == Verdict.INNOCENT:
+        return Sum([If(s.is_innocent, 1, 0) for s in suspects])
+    elif verdict == Verdict.CRIMINAL:
+        return Sum([If(s.is_innocent, 0, 1) for s in suspects])
 
 
 # Get input data from browser console
@@ -541,13 +560,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # thirteenth clue, from Ellie - "Chris has more criminal neighbors than Paula"
-    chris_criminal_count = Sum([If(Not(s.is_innocent), 1, 0)
-                               for s in puzzle.suspects["Chris"].neighbors])
-    paula_criminal_count = Sum([If(Not(s.is_innocent), 1, 0)
-                               for s in puzzle.suspects["Paula"].neighbors])
-    puzzle.solver.add(chris_criminal_count > paula_criminal_count)
-
+    # thirteenth clue, from Ellie
+    puzzle.handle_clue("Chris has more criminal neighbors than Paula")
     puzzle.solve_many()
     print()
 

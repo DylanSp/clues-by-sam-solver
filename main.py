@@ -259,8 +259,8 @@ class Puzzle:
                     neighbor_subset, int(num_suspects), verdict)
 
             # TODO - case for above/below as well as left/right
-            case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict_str, "to", "the", ("left" | "right") as direction_name, "of", suspect_name]:
-                direction = Direction(direction_name)
+            case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ('innocent' | 'innocents' | 'criminal' | 'criminals') as verdict_str, "to", "the", ("left" | "right") as direction_str, "of", suspect_name]:
+                direction = Direction(direction_str)
                 parity = Parity(parity_str)
                 verdict = Verdict.parse(verdict_str)
                 neighbor_subset = self.get_suspects_relative_to_other_suspect(
@@ -269,8 +269,8 @@ class Puzzle:
                 self.set_has_parity(neighbor_subset, parity, verdict)
 
             # TODO - case for to the left/right of as well as above/below
-            case ["There", "is", "only", "one", ('innocent' | 'criminal') as verdict_str, ("above" | "below") as direction_name, suspect_name]:
-                direction = Direction(direction_name)
+            case ["There", "is", "only", "one", ('innocent' | 'criminal') as verdict_str, ("above" | "below") as direction_str, suspect_name]:
+                direction = Direction(direction_str)
                 neighbor_subset = self.get_suspects_relative_to_other_suspect(
                     suspect_name, direction)
                 verdict = Verdict.parse(verdict_str)
@@ -315,10 +315,10 @@ class Puzzle:
                 self.solver.add(profession1_count == profession2_count)
 
             # TODO - double-check wording for cases where this refers to multiple suspects - is the "have" actually needed?
-            case ["Exactly", num_suspects, profession_plural, ("has" | "have"), "a", ("innocent" | "criminal") as verdict_str, "directly", ("above" | "below") as direction_name, "them"]:
+            case ["Exactly", num_suspects, profession_plural, ("has" | "have"), "a", ("innocent" | "criminal") as verdict_str, "directly", ("above" | "below") as direction_str, "them"]:
                 profession = profession_plural.removesuffix("s")
                 profession_members = self.all_of_profession(profession)
-                direction = Direction(direction_name)
+                direction = Direction(direction_str)
                 profession_neighbors = [p.neighbor_in_direction(
                     direction) for p in profession_members]
                 filtered_neighbors = [
@@ -332,7 +332,7 @@ class Puzzle:
                         set(filtered_neighbors), int(num_suspects))
 
             # TODO - what's the exact wording for "to the left of/to the right of"? does that case happen?
-            case ["Exactly", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict_str, "neighboring", central_suspect, "are", ("above" | "below") as direction_name, other_suspect]:
+            case ["Exactly", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict_str, "neighboring", central_suspect, "are", ("above" | "below") as direction_str, other_suspect]:
                 # first part - central_suspect has num_neighbors with verdict
                 central_suspect_neighbors = self.suspects[central_suspect].neighbors
                 verdict = Verdict.parse(verdict_str)
@@ -340,8 +340,8 @@ class Puzzle:
                 self.set_has_exactly_n_of_verdict(
                     central_suspect_neighbors, int(num_neighbors), verdict)
 
-                # second part - of those neighbors, num_neighbor_subset in direction_name relative to other_suspect, have verdict
-                direction = Direction(direction_name)
+                # second part - of those neighbors, num_neighbor_subset in direction_str relative to other_suspect, have verdict
+                direction = Direction(direction_str)
                 neighbor_subset = central_suspect_neighbors & self.get_suspects_relative_to_other_suspect(
                     other_suspect, direction)
 

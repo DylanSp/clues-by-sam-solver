@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 import json
-from typing import List, Optional, Set, Tuple
-from z3 import Int, Solver, sat, Or, And, Not, If, Bool, Bools, ArithRef, BoolRef, BoolVector, AtLeast, AtMost, sat, unsat, Sum, ForAll, Exists
+from typing import List, Optional, Set
+from z3 import Solver, sat, Or, And, Not, If, Bool, BoolRef, AtLeast, AtMost, unsat, Sum
 
 NUM_ROWS = 5
 NUM_COLS = 4

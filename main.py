@@ -389,6 +389,12 @@ class Puzzle:
                 self.solver.add(more_suspect_neighbor_count >
                                 less_suspect_neighbor_count)
 
+            # TODO - version of this for "to the left/right"?
+            case ["Both", ("innocent" | "criminals") as verdict_str, ("above" | "below") as direction_str, suspect1_name, "are", suspect2_name, "neighbors"]:
+                # note - suspect2_name has "'s" at the end, i.e. "Isaac's"
+
+                pass
+
     def set_has_exactly_n_of_verdict(self, suspects: set[Suspect], num_of_verdict: int, verdict: Verdict):
         if verdict == Verdict.INNOCENT:
             refs = [suspect.is_innocent for suspect in suspects]

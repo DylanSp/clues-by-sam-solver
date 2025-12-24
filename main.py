@@ -1,18 +1,22 @@
+import json
 from models import Verdict
-from puzzle import Puzzle
+from puzzle import Puzzle, PuzzleInput
 
 
 # Get input data from browser console
 # data from Puzzle Pack #1, puzzle 1
 # https://cluesbysam.com/s/user/63f90e0e67bb92cd/pack-1/1/
-input_data = '[{"name":"Alex","profession":"cook"},{"name":"Bonnie","profession":"painter"},{"name":"Chris","profession":"cook"},{"name":"Ellie","profession":"cop"},{"name":"Frank","profession":"farmer"},{"name":"Helen","profession":"cook"},{"name":"Isaac","profession":"guard"},{"name":"Julie","profession":"clerk"},{"name":"Keith","profession":"farmer"},{"name":"Megan","profession":"painter"},{"name":"Nancy","profession":"guard"},{"name":"Olof","profession":"clerk"},{"name":"Paula","profession":"cop"},{"name":"Ryan","profession":"sleuth"},{"name":"Sofia","profession":"guard"},{"name":"Terry","profession":"sleuth"},{"name":"Vicky","profession":"farmer"},{"name":"Wally","profession":"mech"},{"name":"Xavi","profession":"mech"},{"name":"Zara","profession":"mech"}]'
+raw_input_data = '[{"name":"Alex","profession":"cook"},{"name":"Bonnie","profession":"painter"},{"name":"Chris","profession":"cook"},{"name":"Ellie","profession":"cop"},{"name":"Frank","profession":"farmer"},{"name":"Helen","profession":"cook"},{"name":"Isaac","profession":"guard"},{"name":"Julie","profession":"clerk"},{"name":"Keith","profession":"farmer"},{"name":"Megan","profession":"painter"},{"name":"Nancy","profession":"guard"},{"name":"Olof","profession":"clerk"},{"name":"Paula","profession":"cop"},{"name":"Ryan","profession":"sleuth"},{"name":"Sofia","profession":"guard"},{"name":"Terry","profession":"sleuth"},{"name":"Vicky","profession":"farmer"},{"name":"Wally","profession":"mech"},{"name":"Xavi","profession":"mech"},{"name":"Zara","profession":"mech"}]'
 
 
 def main():
-    puzzle = Puzzle(input_data)
+    input_data = PuzzleInput(
+        suspects=json.loads(raw_input_data),
+        starting_suspect_name="Frank",
+        starting_suspect_verdict=Verdict.INNOCENT
+    )
 
-    # initial uncovered suspect
-    puzzle.set_single_verdict("Frank", Verdict.INNOCENT)
+    puzzle = Puzzle(input_data)
 
     # first clue, from Frank
     puzzle.handle_clue("Exactly 1 innocent in column A is neighboring Megan")

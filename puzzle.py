@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Set, TypedDict
+from typing import Optional, Set, TypedDict
 from models import Column, Direction, Parity, Verdict
 from z3 import Solver, Bool, BoolRef, Not, And, Or, AtLeast, AtMost, If, Sum, sat, unsat
 
@@ -129,6 +129,8 @@ class Puzzle:
         self.set_single_verdict(
             input_data.starting_suspect_name, input_data.starting_suspect_verdict)
 
+    # methods to get specific sets of suspects
+
     def row(self, row_num: int) -> Set[PuzzleSuspect]:
         return set([suspect for suspect in self.suspects.values() if suspect.row == row_num])
 
@@ -147,6 +149,115 @@ class Puzzle:
             case Direction.RIGHT:
                 return set([suspect for suspect in self.suspects.values() if suspect.row == root_suspect.row and suspect.column > root_suspect.column])
 
+    def all_of_profession(self, profession_name: str) -> Set[PuzzleSuspect]:
+        return set([suspect for suspect in self.suspects.values() if suspect.profession == profession_name])
+
+    def edges(self) -> Set[PuzzleSuspect]:
+        return self.row(1) | self.row(5) | self.column(Column.A) | self.column(Column.D)
+
+    # methods to add constraints to solver
+
+    def set_has_exactly_n_of_verdict(self, suspects: set[PuzzleSuspect], num_of_verdict: int, verdict: Verdict):
+        if verdict == Verdict.INNOCENT:
+            refs = [suspect.is_innocent for suspect in suspects]
+        elif verdict == Verdict.CRIMINAL:
+            refs = [Not(suspect.is_innocent) for suspect in suspects]
+
+        self.solver.add(AtLeast(*refs, num_of_verdict))
+        self.solver.add(AtMost(*refs, num_of_verdict))
+
+    def set_has_parity(self, suspects: set[PuzzleSuspect], parity: Parity, verdict: Verdict):
+        count = count_suspects_with_verdict(suspects, verdict)
+        if parity == Parity.ODD:
+            self.solver.add(count % 2 == 1)
+        elif parity == Parity.EVEN:
+            self.solver.add(count % 2 == 0)
+
+    def column_has_most_of_verdict(self, column: Column, verdict: Verdict):
+        column_count = count_suspects_with_verdict(
+            self.column(column), verdict)
+
+        for other_col in Column:
+            if other_col != column:
+                other_col_count = count_suspects_with_verdict(
+                    self.column(other_col), verdict)
+                self.solver.add(column_count > other_col_count)
+
+    # checking for connection:
+    # "all innocents are connected" => no criminals in set have innocents to both sides (or vice versa for criminals)
+    # so to assert this, for each suspect in set, either
+    # a.) suspect has given verdict
+    # b.) suspect does not have given verdict AND does not have neighbors on both sides with given verdict
+    # we need two methods, one horizontal, one vertical, to govern which neighbors are checked
+
+    def all_suspects_in_horizontal_set_with_verdict_are_connected(self, suspects: set[PuzzleSuspect], verdict: Verdict):
+        for suspect in suspects:
+            left_neighbor = suspect.neighbor_in_direction(Direction.LEFT)
+            right_neighbor = suspect.neighbor_in_direction(Direction.RIGHT)
+
+            # make sure we're only checking for neighbors within the set
+            # this implicitly checks that left_neighbor/right_neighbor aren't None - `None in suspects` is false
+            if left_neighbor in suspects and right_neighbor in suspects:
+                if verdict == Verdict.INNOCENT:
+                    self.solver.add(
+                        Or(
+                            suspect.is_innocent,
+                            Not(
+                                And(
+                                    left_neighbor.is_innocent,
+                                    right_neighbor.is_innocent
+                                )
+                            )
+                        )
+                    )
+                elif verdict == Verdict.CRIMINAL:
+                    self.solver.add(
+                        Or(
+                            Not(suspect.is_innocent),
+                            Not(
+                                And(
+                                    Not(left_neighbor.is_innocent),
+                                    Not(right_neighbor.is_innocent)
+                                )
+                            )
+                        )
+                    )
+
+    def all_suspects_in_vertical_set_with_verdict_are_connected(self, suspects: set[PuzzleSuspect], verdict: Verdict):
+        for suspect in suspects:
+            above_neighbor = suspect.neighbor_in_direction(Direction.ABOVE)
+            below_neighbor = suspect.neighbor_in_direction(Direction.BELOW)
+
+            # make sure we're only checking for neighbors within the set
+            # this implicitly checks that above_neighbor/below_neighbor aren't None - `None in suspects` is false
+            if above_neighbor in suspects and below_neighbor in suspects:
+                if verdict == Verdict.INNOCENT:
+                    self.solver.add(
+                        Or(
+                            suspect.is_innocent,
+                            Not(
+                                And(
+                                    above_neighbor.is_innocent,
+                                    below_neighbor.is_innocent
+                                )
+                            )
+                        )
+                    )
+                elif verdict == Verdict.CRIMINAL:
+                    self.solver.add(
+                        Or(
+                            Not(suspect.is_innocent),
+                            Not(
+                                And(
+                                    Not(above_neighbor.is_innocent),
+                                    Not(below_neighbor.is_innocent)
+                                )
+                            )
+                        )
+                    )
+
+    # methods for solving puzzle
+
     def set_single_verdict(self, suspect_name: str, verdict: Verdict):
         suspect = self.suspects[suspect_name]
         self.unsolved_suspects.discard(suspect)
@@ -157,12 +268,6 @@ class Puzzle:
         elif verdict == Verdict.CRIMINAL:
             print(f'{suspect_name} is criminal')
             self.solver.add(Not(suspect.is_innocent))
-
-    def all_of_profession(self, profession_name: str) -> Set[PuzzleSuspect]:
-        return set([suspect for suspect in self.suspects.values() if suspect.profession == profession_name])
-
-    def edges(self) -> Set[PuzzleSuspect]:
-        return self.row(1) | self.row(5) | self.column(Column.A) | self.column(Column.D)
 
     # Try to deduce additional verdicts; returns true if a suspect's status was deduced
     def solve_one(self) -> bool:
@@ -213,7 +318,7 @@ class Puzzle:
                 progress_made = True
         return progress_made
 
-    def handle_clue(self, clue: str, suspect_with_clue: str = ""):
+    def parse_clue(self, clue: str, suspect_with_clue: str = ""):
         match clue.split():
             # TODO - does this need to have "is" | "are"?
             # TODO - version of this for rows
@@ -417,113 +522,6 @@ class Puzzle:
 
                 self.all_suspects_in_horizontal_set_with_verdict_are_connected(
                     row_suspects, verdict)
-
-    def set_has_exactly_n_of_verdict(self, suspects: set[PuzzleSuspect], num_of_verdict: int, verdict: Verdict):
-        if verdict == Verdict.INNOCENT:
-            refs = [suspect.is_innocent for suspect in suspects]
-        elif verdict == Verdict.CRIMINAL:
-            refs = [Not(suspect.is_innocent) for suspect in suspects]
-
-        self.solver.add(AtLeast(*refs, num_of_verdict))
-        self.solver.add(AtMost(*refs, num_of_verdict))
-
-    def set_has_parity(self, suspects: set[PuzzleSuspect], parity: Parity, verdict: Verdict):
-        count = count_suspects_with_verdict(suspects, verdict)
-        if parity == Parity.ODD:
-            self.solver.add(count % 2 == 1)
-        elif parity == Parity.EVEN:
-            self.solver.add(count % 2 == 0)
-
-    def column_has_most_of_verdict(self, column: Column, verdict: Verdict):
-        column_count = count_suspects_with_verdict(
-            self.column(column), verdict)
-
-        for other_col in Column:
-            if other_col != column:
-                other_col_count = count_suspects_with_verdict(
-                    self.column(other_col), verdict)
-                self.solver.add(column_count > other_col_count)
-
-    # checking for connection:
-    # "all innocents are connected" => no criminals in set have innocents to both sides (or vice versa for criminals)
-    # so to assert this, for each suspect in set, either
-    # a.) suspect has given verdict
-    # b.) suspect does not have given verdict AND does not have neighbors on both sides with given verdict
-    # we need two methods, one horizontal, one vertical, to govern which neighbors are checked
-
-    def all_suspects_in_horizontal_set_with_verdict_are_connected(self, suspects: set[PuzzleSuspect], verdict: Verdict):
-        for suspect in suspects:
-            left_neighbor = suspect.neighbor_in_direction(Direction.LEFT)
-            right_neighbor = suspect.neighbor_in_direction(Direction.RIGHT)
-
-            # make sure we're only checking for neighbors within the set
-            # this implicitly checks that left_neighbor/right_neighbor aren't None - `None in suspects` is false
-            if left_neighbor in suspects and right_neighbor in suspects:
-                if verdict == Verdict.INNOCENT:
-                    self.solver.add(
-                        Or(
-                            suspect.is_innocent,
-                            Not(
-                                And(
-                                    left_neighbor.is_innocent,
-                                    right_neighbor.is_innocent
-                                )
-                            )
-                        )
-                    )
-                elif verdict == Verdict.CRIMINAL:
-                    self.solver.add(
-                        Or(
-                            Not(suspect.is_innocent),
-                            Not(
-                                And(
-                                    Not(left_neighbor.is_innocent),
-                                    Not(right_neighbor.is_innocent)
-                                )
-                            )
-                        )
-                    )
-
-    def all_suspects_in_vertical_set_with_verdict_are_connected(self, suspects: set[PuzzleSuspect], verdict: Verdict):
-        for suspect in suspects:
-            above_neighbor = suspect.neighbor_in_direction(Direction.ABOVE)
-            below_neighbor = suspect.neighbor_in_direction(Direction.BELOW)
-
-            # make sure we're only checking for neighbors within the set
-            # this implicitly checks that above_neighbor/below_neighbor aren't None - `None in suspects` is false
-            if above_neighbor in suspects and below_neighbor in suspects:
-                if verdict == Verdict.INNOCENT:
-                    self.solver.add(
-                        Or(
-                            suspect.is_innocent,
-                            Not(
-                                And(
-                                    above_neighbor.is_innocent,
-                                    below_neighbor.is_innocent
-                                )
-                            )
-                        )
-                    )
-                elif verdict == Verdict.CRIMINAL:
-                    self.solver.add(
-                        Or(
-                            Not(suspect.is_innocent),
-                            Not(
-                                And(
-                                    Not(above_neighbor.is_innocent),
-                                    Not(below_neighbor.is_innocent)
-                                )
-                            )
-                        )
-                    )
-
-
-def sort_vertical_suspects(suspects: Set[PuzzleSuspect]) -> List[PuzzleSuspect]:
-    # Check that all suspects are in the same column
-    # create a set of all unique column values - should have exactly 1 element
-    assert len({s.column for s in suspects}) == 1
-
-    return sorted(suspects, key=lambda suspect: suspect.name)
 
 
 def count_suspects_with_verdict(suspects: set[PuzzleSuspect], verdict: Verdict):

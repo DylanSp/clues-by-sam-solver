@@ -316,6 +316,7 @@ class Puzzle:
 
             # TODO - double-check wording for cases where this refers to multiple suspects - is the "have" actually needed?
             case ["Exactly", num_suspects, profession_plural, ("has" | "have"), "a", ("innocent" | "criminal") as verdict_str, "directly", ("above" | "below") as direction_str, "them"]:
+                verdict = Verdict.parse(verdict_str)
                 profession = profession_plural.removesuffix("s")
                 profession_members = self.all_of_profession(profession)
                 direction = Direction(direction_str)
@@ -324,13 +325,8 @@ class Puzzle:
                 filtered_neighbors = [
                     n for n in profession_neighbors if n is not None]
 
-                # TODO - refactor to parse verdict and use self.set_has_exactly_n_of_verdict()
-                if verdict_str == "innocent":
-                    self.set_has_exactly_n_innocents(
-                        set(filtered_neighbors), int(num_suspects))
-                elif verdict_str == "criminal":
-                    self.set_has_exactly_n_criminals(
-                        set(filtered_neighbors), int(num_suspects))
+                self.set_has_exactly_n_of_verdict(
+                    set(filtered_neighbors), int(num_suspects), verdict)
 
             # TODO - what's the exact wording for "to the left of/to the right of"? does that case happen?
             case ["Exactly", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict_str, "neighboring", central_suspect, "are", ("above" | "below") as direction_str, other_suspect]:
@@ -416,16 +412,6 @@ class Puzzle:
 
         self.solver.add(AtLeast(*refs, num_of_verdict))
         self.solver.add(AtMost(*refs, num_of_verdict))
-
-    def set_has_exactly_n_innocents(self, suspects: set[Suspect], num_innocents: int):
-        refs = [suspect.is_innocent for suspect in suspects]
-        self.solver.add(AtLeast(*refs, num_innocents))
-        self.solver.add(AtMost(*refs, num_innocents))
-
-    def set_has_exactly_n_criminals(self, suspects: set[Suspect], num_criminals: int):
-        refs = [Not(suspect.is_innocent) for suspect in suspects]
-        self.solver.add(AtLeast(*refs, num_criminals))
-        self.solver.add(AtMost(*refs, num_criminals))
 
     def set_has_parity(self, suspects: set[Suspect], parity: Parity, verdict: Verdict):
         count = count_suspects_with_verdict(suspects, verdict)

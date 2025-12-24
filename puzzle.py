@@ -63,6 +63,12 @@ class PuzzleSuspect:
         return f"<{self.__class__.__name__} at {hex(id(self))}"
 
 
+@dataclass
+class SuspectSolution:
+    name: str
+    verdict: Verdict
+
+
 class Puzzle:
     suspects: dict[str, PuzzleSuspect]  # suspects by name
     solver: Solver
@@ -101,7 +107,8 @@ class Puzzle:
                 column=Column(idx % NUM_COLS),
             )
             self.suspects[suspect.name] = suspect
-            self.unsolved_suspects.add(suspect)
+            if suspect.name != input_data.starting_suspect_name:
+                self.unsolved_suspects.add(suspect)
 
             # add to grid to use when setting up neighbors later
             grid[idx // NUM_COLS][idx % NUM_COLS] = suspect
@@ -128,6 +135,9 @@ class Puzzle:
         # set up initial suspect
         self.set_single_verdict(
             input_data.starting_suspect_name, input_data.starting_suspect_verdict)
+
+    def is_solved(self) -> bool:
+        return len(self.unsolved_suspects) == 0
 
     # methods to get specific sets of suspects
 
@@ -165,6 +175,10 @@ class Puzzle:
 
         self.solver.add(AtLeast(*refs, num_of_verdict))
         self.solver.add(AtMost(*refs, num_of_verdict))
+
+    def set_single_verdict(self, suspect_name: str, verdict: Verdict):
+        suspect = self.suspects[suspect_name]
+        self.set_has_exactly_n_of_verdict(set([suspect]), 1, verdict)
 
     def set_has_parity(self, suspects: set[PuzzleSuspect], parity: Parity, verdict: Verdict):
         count = count_suspects_with_verdict(suspects, verdict)
@@ -258,19 +272,10 @@ class Puzzle:
 
     # methods for solving puzzle
 
-    def set_single_verdict(self, suspect_name: str, verdict: Verdict):
-        suspect = self.suspects[suspect_name]
-        self.unsolved_suspects.discard(suspect)
-
-        if verdict == Verdict.INNOCENT:
-            print(f'{suspect_name} is innocent')
-            self.solver.add(suspect.is_innocent)
-        elif verdict == Verdict.CRIMINAL:
-            print(f'{suspect_name} is criminal')
-            self.solver.add(Not(suspect.is_innocent))
-
-    # Try to deduce additional verdicts; returns true if a suspect's status was deduced
-    def solve_one(self) -> bool:
+    def solve_one(self) -> Optional[SuspectSolution]:
+        """
+        Try to deduce a verdict; returns the first deduced status, if possible, otherwise returns None
+        """
         for suspect in self.unsolved_suspects:
             assert self.solver.check() == sat, "Solver is not currently satisfiable!"
 
@@ -283,8 +288,8 @@ class Puzzle:
                 self.solver.pop()
                 self.solver.add(Not(suspect.is_innocent))
                 self.unsolved_suspects.discard(suspect)
-                print(f'{suspect.name} is criminal')
-                return True
+                # print(f'{suspect.name} is criminal')
+                return SuspectSolution(name=suspect.name, verdict=Verdict.CRIMINAL)
             else:
                 # reset to previous backtracking point
                 self.solver.pop()
@@ -298,27 +303,24 @@ class Puzzle:
                 self.solver.pop()
                 self.solver.add(suspect.is_innocent)
                 self.unsolved_suspects.discard(suspect)
-                print(f'{suspect.name} is innocent')
-                return True
+                # print(f'{suspect.name} is innocent')
+                return SuspectSolution(name=suspect.name, verdict=Verdict.INNOCENT)
             else:
                 # reset to previous backtracking point
                 self.solver.pop()
 
-        return False
+        return None
 
-    # Deduce as many verdicts as can be found with current clues
-    # Returns true if some progress was made (regardless of how much)
-    # TODO - does this need to return a value?
-    def solve_many(self) -> bool:
-        can_make_progress = True
-        progress_made = False
-        while can_make_progress:
-            can_make_progress = self.solve_one()
-            if can_make_progress:
-                progress_made = True
-        return progress_made
+        solutions_found = []
+        while True:
+            match self.solve_one():
+                case None:
+                    break
+                case solution:
+                    solutions_found.append(solution)
+        return solutions_found
 
-    def parse_clue(self, clue: str, suspect_with_clue: str = ""):
+    def add_constraints_from_clue(self, clue: str, suspect_with_clue: str = ""):
         match clue.split():
             # TODO - does this need to have "is" | "are"?
             # TODO - version of this for rows
@@ -522,6 +524,24 @@ class Puzzle:
 
                 self.all_suspects_in_horizontal_set_with_verdict_are_connected(
                     row_suspects, verdict)
+
+    # primary entrypoint
+
+    def add_clue(self, clue: str, suspect_with_clue: str) -> list[SuspectSolution]:
+        """
+        Add a new clue to the puzzle, including the source of the clue. Returns a list of newly deduced solutions.
+        """
+        new_solutions_found = []
+        self.add_constraints_from_clue(clue, suspect_with_clue)
+
+        while True:
+            match self.solve_one():
+                case None:
+                    break
+                case solution:
+                    new_solutions_found.append(solution)
+
+        return new_solutions_found
 
 
 def count_suspects_with_verdict(suspects: set[PuzzleSuspect], verdict: Verdict):

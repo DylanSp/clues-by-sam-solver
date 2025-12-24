@@ -1,3 +1,4 @@
+from collections import deque
 import json
 from models import Verdict
 from puzzle import Puzzle, PuzzleInput
@@ -18,93 +19,47 @@ def main():
 
     puzzle = Puzzle(input_data)
 
-    # first clue, from Frank
-    puzzle.parse_clue("Exactly 1 innocent in column A is neighboring Megan")
-    puzzle.solve_many()
-    print()
+    # clue, then suspect who gave clue
+    clues = [
+        ["Exactly 1 innocent in column A is neighboring Megan", "Frank"],
+        ["There's an odd number of criminals to the left of Sofia", "Keith"],
+        ["There is only one innocent above Keith", "Ryan"],
+        ["Both criminals below me are connected", "Alex"],
+        ["Xavi is one of 4 innocents in column C", "Vicky"],
+        ["There are as many criminal farmers as there are criminal guards", "Xavi"],
+        ["Exactly 1 guard has a criminal directly below them", "Chris"],
+        ["Exactly 2 of the 3 criminals neighboring Megan are above Vicky", "Isaac"],
+        ["All innocents in row 5 are connected", "Helen"],
+        ["An odd number of innocents in row 1 neighbor Helen", "Wally"],
+        ["Column C has more innocents than any other column", "Bonnie"],
+        ["there are more criminals than innocents in row 1", "Megan"],
+        ["Chris has more criminal neighbors than Paula", "Ellie"],
+        ["Terry is one of two or more innocents on the edges", "Julie"],
+        ["Both criminals above Zara are Isaac's neighbors", "Terry"],
+        ["The only criminal below Julie is Terry's neighbor", "Olof"],
+        ["Xavi has more innocent neighbors than Isaac", "Zara"],
+    ]
 
-    # second clue, from Keith
-    puzzle.parse_clue(
-        "There's an odd number of criminals to the left of Sofia")
-    puzzle.solve_many()
-    print()
+    # TODO - initialize only with initial clue (when interactivity is added)
+    unhandled_clues = deque(clues)
 
-    # third clue, from Ryan
-    puzzle.parse_clue("There is only one innocent above Keith")
-    puzzle.solve_many()
-    print()
+    # main driver loop
+    while not puzzle.is_solved() and len(unhandled_clues) > 0:
+        next_clue_data = unhandled_clues.popleft()
+        next_clue = next_clue_data[0]
+        source = next_clue_data[1]
+        newly_solved_suspects = puzzle.add_clue(next_clue, source)
 
-    # fourth clue, from Alex
-    puzzle.parse_clue("Both criminals below me are connected", "Alex")
-    puzzle.solve_many()
-    print()
+        for solution in newly_solved_suspects:
+            print(f"{solution.name} is {solution.verdict}")
 
-    # fifth clue, from Vicky
-    puzzle.parse_clue("Xavi is one of 4 innocents in column C")
-    puzzle.solve_many()
-    print()
+        # TODO - for each newly_solved_suspect, reveal them, assert that the returned verdict is correct, push() their revealed clue to unhandled_clues
+        # TODO - possibly detect flavor text, don't add it to unhandled_clues
 
-    # sixth clue, from Xavi
-    puzzle.parse_clue(
-        "There are as many criminal farmers as there are criminal guards")
-    puzzle.solve_many()
-    print()
-
-    # seventh clue, from Chris
-    puzzle.parse_clue("Exactly 1 guard has a criminal directly below them")
-    puzzle.solve_many()
-    print()
-
-    # eighth clue, from Isaac
-    puzzle.parse_clue(
-        "Exactly 2 of the 3 criminals neighboring Megan are above Vicky")
-    puzzle.solve_many()
-    print()
-
-    # ninth clue, from Helen
-    puzzle.parse_clue("All innocents in row 5 are connected")
-    puzzle.solve_many()
-    print()
-
-    # tenth clue, from Wally
-    puzzle.parse_clue("An odd number of innocents in row 1 neighbor Helen")
-    puzzle.solve_many()
-    print()
-
-    # eleventh clue, from Bonnie
-    puzzle.parse_clue("Column C has more innocents than any other column")
-    puzzle.solve_many()
-    print()
-
-    # twelfth clue, from Megan
-    puzzle.parse_clue("there are more criminals than innocents in row 1")
-    puzzle.solve_many()
-    print()
-
-    # thirteenth clue, from Ellie
-    puzzle.parse_clue("Chris has more criminal neighbors than Paula")
-    puzzle.solve_many()
-    print()
-
-    # fourteenth clue, from Julie
-    puzzle.parse_clue("Terry is one of two or more innocents on the edges")
-    puzzle.solve_many()
-    print()
-
-    # fifteenth clue, from Terry
-    puzzle.parse_clue("Both criminals above Zara are Isaac's neighbors")
-    puzzle.solve_many()
-    print()
-
-    # sixteenth clue, from Olof
-    puzzle.parse_clue("The only criminal below Julie is Terry's neighbor")
-    puzzle.solve_many()
-    print()
-
-    # seventeenth and final clue, from Zara
-    puzzle.parse_clue("Xavi has more innocent neighbors than Isaac")
-    puzzle.solve_many()
-    print()
+    if puzzle.is_solved():
+        print("Puzzle solved!")
+    else:
+        print("Puzzle unsolved, bug somewhere")
 
 
 if __name__ == "__main__":

@@ -607,13 +607,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # seventeenth and final clue, from Zara - "Xavi has more innocent neighbors than Isaac"
-    xavi_innocent_count = Sum([If(s.is_innocent, 1, 0)
-                               for s in puzzle.suspects["Xavi"].neighbors])
-    isaac_innocent_count = Sum([If(s.is_innocent, 1, 0)
-                               for s in puzzle.suspects["Isaac"].neighbors])
-    puzzle.solver.add(xavi_innocent_count > isaac_innocent_count)
-
+    # seventeenth and final clue, from Zara
+    puzzle.handle_clue("Xavi has more innocent neighbors than Isaac")
     puzzle.solve_many()
     print()
 

@@ -324,6 +324,7 @@ class Puzzle:
                 filtered_neighbors = [
                     n for n in profession_neighbors if n is not None]
 
+                # TODO - refactor to parse verdict and use self.set_has_exactly_n_of_verdict()
                 if verdict_str == "innocent":
                     self.set_has_exactly_n_innocents(
                         set(filtered_neighbors), int(num_suspects))
@@ -391,9 +392,21 @@ class Puzzle:
 
             # TODO - version of this for "to the left/right"?
             case ["Both", ("innocent" | "criminals") as verdict_str, ("above" | "below") as direction_str, suspect1_name, "are", suspect2_name, "neighbors"]:
-                # note - suspect2_name has "'s" at the end, i.e. "Isaac's"
+                # original suspect2_name has "'s" at the end, i.e. "Isaac's"
+                suspect2_name = suspect2_name.removesuffix("'s")
+                verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
 
-                pass
+                # first part - there are exactly two innocents/criminals in direction_str relative to suspect1
+                direction_suspects = self.get_suspects_relative_to_other_suspect(
+                    suspect1_name, direction)
+                self.set_has_exactly_n_of_verdict(
+                    direction_suspects, 2, verdict)
+
+                # second part - there are exactly two innocent/criminals in intersection of direction_suspects and neighbors of suspect2
+                neighbor_suspects = self.suspects[suspect2_name].neighbors
+                self.set_has_exactly_n_of_verdict(
+                    direction_suspects & neighbor_suspects, 2, verdict)
 
     def set_has_exactly_n_of_verdict(self, suspects: set[Suspect], num_of_verdict: int, verdict: Verdict):
         if verdict == Verdict.INNOCENT:
@@ -579,7 +592,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # fifteenth clue, from Terry - "Both criminals above Zara are Isaac's neighbors"
+    # fifteenth clue, from Terry
+    puzzle.handle_clue("Both criminals above Zara are Isaac's neighbors")
 
     # exactly 2 criminals above Zara
     above_zara_refs = [Not(s.is_innocent) for s in puzzle.get_suspects_relative_to_other_suspect(

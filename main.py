@@ -404,6 +404,25 @@ class Puzzle:
                 self.set_has_exactly_n_of_verdict(
                     direction_suspects & neighbor_suspects, 2, verdict)
 
+            # TODO - version of this for "to the left/right"?
+            # TODO - combine with above case? same logic, this is just talking about 1 suspect instead of 2
+            case ["The", "only", ("innocent" | "criminal") as verdict_str, ("above" | "below") as direction_str, suspect1_name, "is", suspect2_name, "neighbor"]:
+                # original suspect2_name has "'s" at the end, i.e. "Isaac's"
+                suspect2_name = suspect2_name.removesuffix("'s")
+                verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
+
+                # first part - there is exactly one innocents/criminal in direction_str relative to suspect1
+                direction_suspects = self.get_suspects_relative_to_other_suspect(
+                    suspect1_name, direction)
+                self.set_has_exactly_n_of_verdict(
+                    direction_suspects, 1, verdict)
+
+                # second part - there is exactly one innocent/criminal in intersection of direction_suspects and neighbors of suspect2
+                neighbor_suspects = self.suspects[suspect2_name].neighbors
+                self.set_has_exactly_n_of_verdict(
+                    direction_suspects & neighbor_suspects, 1, verdict)
+
     def set_has_exactly_n_of_verdict(self, suspects: set[Suspect], num_of_verdict: int, verdict: Verdict):
         if verdict == Verdict.INNOCENT:
             refs = [suspect.is_innocent for suspect in suspects]
@@ -583,15 +602,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # sixteenth clue, from Olof - "The only criminal below Julie is Terry's neighbor"
-    below_julie = puzzle.get_suspects_relative_to_other_suspect(
-        "Julie", Direction.BELOW)
-
-    # exactly 1 criminal below Julie
-    clue16_part1_refs = [Not(s.is_innocent) for s in below_julie]
-    puzzle.solver.add(AtLeast(*clue16_part1_refs, 1))
-    puzzle.solver.add(AtMost(*clue16_part1_refs, 1))
-
+    # sixteenth clue, from Olof
+    puzzle.handle_clue("The only criminal below Julie is Terry's neighbor")
     puzzle.solve_many()
     print()
 

@@ -2,8 +2,11 @@ from enum import Enum, IntEnum
 
 
 class Verdict(Enum):
-    INNOCENT = 1
-    CRIMINAL = 2
+    INNOCENT = "innocent"
+    CRIMINAL = "criminal"
+
+    def __str__(self) -> str:
+        return self.value
 
     @classmethod
     def parse(cls, input: str) -> "Verdict":

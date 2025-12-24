@@ -442,6 +442,14 @@ class Puzzle:
                 self.all_suspects_in_vertical_set_with_verdict_are_connected(
                     direction_suspects, verdict)
 
+            # TODO - version of this for columns?
+            case ["All", ("innocents" | "criminals") as verdict_str, "in", "row", row, "are", "connected"]:
+                verdict = Verdict.parse(verdict_str)
+                row_suspects = self.row(int(row))
+
+                self.all_suspects_in_horizontal_set_with_verdict_are_connected(
+                    row_suspects, verdict)
+
     def set_has_exactly_n_of_verdict(self, suspects: set[Suspect], num_of_verdict: int, verdict: Verdict):
         if verdict == Verdict.INNOCENT:
             refs = [suspect.is_innocent for suspect in suspects]
@@ -612,22 +620,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # ninth clue, from Helen - "All innocents in row 5 are connected"
-
-    # "All innocents are connected" is false iff some criminal in the row has innocents on both left and right
-    constraint_list = []
-    for suspect in puzzle.row(5):
-        left_neighbor = suspect.neighbor_in_direction(Direction.LEFT)
-        right_neighbor = suspect.neighbor_in_direction(Direction.RIGHT)
-        if left_neighbor is not None and right_neighbor is not None:
-            # this is true iff innocents in the row are NOT connected
-            counterexample_constraint = And(
-                Not(suspect.is_innocent), left_neighbor.is_innocent, right_neighbor.is_innocent)
-
-            constraint_list.append(counterexample_constraint)
-    # the counterexample is not true for any suspect in the row
-    puzzle.solver.add(Not(Or(*constraint_list)))
-
+    # ninth clue, from Helen
+    puzzle.handle_clue("All innocents in row 5 are connected")
     puzzle.solve_many()
     print()
 

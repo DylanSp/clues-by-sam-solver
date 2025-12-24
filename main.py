@@ -245,7 +245,7 @@ class Puzzle:
                 progress_made = True
         return progress_made
 
-    def handle_clue(self, clue: str):
+    def handle_clue(self, clue: str, suspect_with_clue: str = ""):
         match clue.split():
             # TODO - does this need to have "is" | "are"?
             # TODO - version of this for rows
@@ -423,6 +423,25 @@ class Puzzle:
                 self.set_has_exactly_n_of_verdict(
                     direction_suspects & neighbor_suspects, 1, verdict)
 
+            # TODO - version of this for "to the left/right"?
+            case ["Both", ("innocents" | "criminals") as verdict_str, ("above" | "below") as direction_str, "me", "are", "connected"]:
+                if suspect_with_clue == "":
+                    raise ValueError(
+                        "need a suspect name for a clue containing 'me'")
+
+                verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
+
+                # first part - there are exactly two innocents/criminals in direction_str relative to suspect
+                direction_suspects = self.get_suspects_relative_to_other_suspect(
+                    suspect_with_clue, direction)
+                self.set_has_exactly_n_of_verdict(
+                    direction_suspects, 2, verdict)
+
+                # second part - all innocents/criminals in direction_str are connected
+                self.all_suspects_in_vertical_set_with_verdict_are_connected(
+                    direction_suspects, verdict)
+
     def set_has_exactly_n_of_verdict(self, suspects: set[Suspect], num_of_verdict: int, verdict: Verdict):
         if verdict == Verdict.INNOCENT:
             refs = [suspect.is_innocent for suspect in suspects]
@@ -448,6 +467,79 @@ class Puzzle:
                 other_col_count = count_suspects_with_verdict(
                     self.column(other_col), verdict)
                 self.solver.add(column_count > other_col_count)
+
+    # checking for connection:
+    # "all innocents are connected" => no criminals in set have innocents to both sides (or vice versa for criminals)
+    # so to assert this, for each suspect in set, either
+    # a.) suspect has given verdict
+    # b.) suspect does not have given verdict AND does not have neighbors on both sides with given verdict
+    # we need two methods, one horizontal, one vertical, to govern which neighbors are checked
+
+    def all_suspects_in_horizontal_set_with_verdict_are_connected(self, suspects: set[Suspect], verdict: Verdict):
+        for suspect in suspects:
+            left_neighbor = suspect.neighbor_in_direction(Direction.LEFT)
+            right_neighbor = suspect.neighbor_in_direction(Direction.RIGHT)
+
+            # make sure we're only checking for neighbors within the set
+            # this implicitly checks that left_neighbor/right_neighbor aren't None - `None in suspects` is false
+            if left_neighbor in suspects and right_neighbor in suspects:
+                if verdict == Verdict.INNOCENT:
+                    self.solver.add(
+                        Or(
+                            suspect.is_innocent,
+                            Not(
+                                And(
+                                    left_neighbor.is_innocent,
+                                    right_neighbor.is_innocent
+                                )
+                            )
+                        )
+                    )
+                elif verdict == Verdict.CRIMINAL:
+                    self.solver.add(
+                        Or(
+                            Not(suspect.is_innocent),
+                            Not(
+                                And(
+                                    Not(left_neighbor.is_innocent),
+                                    Not(right_neighbor.is_innocent)
+                                )
+                            )
+                        )
+                    )
+
+    def all_suspects_in_vertical_set_with_verdict_are_connected(self, suspects: set[Suspect], verdict: Verdict):
+        for suspect in suspects:
+            above_neighbor = suspect.neighbor_in_direction(Direction.ABOVE)
+            below_neighbor = suspect.neighbor_in_direction(Direction.BELOW)
+
+            # make sure we're only checking for neighbors within the set
+            # this implicitly checks that above_neighbor/below_neighbor aren't None - `None in suspects` is false
+            if above_neighbor in suspects and below_neighbor in suspects:
+                if verdict == Verdict.INNOCENT:
+                    self.solver.add(
+                        Or(
+                            suspect.is_innocent,
+                            Not(
+                                And(
+                                    above_neighbor.is_innocent,
+                                    below_neighbor.is_innocent
+                                )
+                            )
+                        )
+                    )
+                elif verdict == Verdict.CRIMINAL:
+                    self.solver.add(
+                        Or(
+                            Not(suspect.is_innocent),
+                            Not(
+                                And(
+                                    Not(above_neighbor.is_innocent),
+                                    Not(below_neighbor.is_innocent)
+                                )
+                            )
+                        )
+                    )
 
 
 def sort_vertical_suspects(suspects: Set[Suspect]) -> List[Suspect]:
@@ -493,41 +585,8 @@ def main():
     puzzle.solve_many()
     print()
 
-    # fourth clue, from Alex - "Both criminals below me are connected"
-    # TODO - when passing to handle_clue - how to handle "me"?
-
-    # "Both criminals" = exactly 2 criminals below
-    clue4_below = puzzle.get_suspects_relative_to_other_suspect(
-        "Alex", Direction.BELOW)
-    clue4_below_refs = [Not(suspect.is_innocent) for suspect in clue4_below]
-    puzzle.solver.add(AtLeast(*clue4_below_refs, 2))
-    puzzle.solver.add(AtMost(*clue4_below_refs, 2))
-
-    # "Are connected"
-    # TODO - hardcodes 2 connected out of length 4 - generalize
-    clue4_below_sorted = sort_vertical_suspects(clue4_below)
-    assert len(clue4_below_sorted) == 4
-    puzzle.solver.add(Or(
-        And(
-            Not(clue4_below_sorted[0].is_innocent),
-            Not(clue4_below_sorted[1].is_innocent),
-            clue4_below_sorted[2].is_innocent,
-            clue4_below_sorted[3].is_innocent
-        ),
-        And(
-            clue4_below_sorted[0].is_innocent,
-            Not(clue4_below_sorted[1].is_innocent),
-            Not(clue4_below_sorted[2].is_innocent),
-            clue4_below_sorted[3].is_innocent
-        ),
-        And(
-            clue4_below_sorted[0].is_innocent,
-            clue4_below_sorted[1].is_innocent,
-            Not(clue4_below_sorted[2].is_innocent),
-            Not(clue4_below_sorted[3].is_innocent)
-        ),
-    ))
-
+    # fourth clue, from Alex
+    puzzle.handle_clue("Both criminals below me are connected", "Alex")
     puzzle.solve_many()
     print()
 

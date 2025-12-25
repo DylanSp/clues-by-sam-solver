@@ -521,6 +521,9 @@ class Puzzle:
                 self._all_suspects_in_horizontal_set_with_verdict_are_connected(
                     row_suspects, verdict)
 
+            case _:
+                print(f"Unrecognized clue type: {clue}")
+
     # primary entrypoint
 
     def add_clue(self, clue: str, suspect_with_clue: str) -> list[SuspectSolution]:

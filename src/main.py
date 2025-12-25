@@ -3,7 +3,7 @@ import json
 
 from models import Verdict
 from puzzle import Puzzle, PuzzleInput
-
+from autoplayer import complete_puzzle
 
 # Get input data from browser console
 # data from Puzzle Pack #1, puzzle 1
@@ -11,7 +11,25 @@ from puzzle import Puzzle, PuzzleInput
 raw_input_data = '[{"name":"Alex","profession":"cook"},{"name":"Bonnie","profession":"painter"},{"name":"Chris","profession":"cook"},{"name":"Ellie","profession":"cop"},{"name":"Frank","profession":"farmer"},{"name":"Helen","profession":"cook"},{"name":"Isaac","profession":"guard"},{"name":"Julie","profession":"clerk"},{"name":"Keith","profession":"farmer"},{"name":"Megan","profession":"painter"},{"name":"Nancy","profession":"guard"},{"name":"Olof","profession":"clerk"},{"name":"Paula","profession":"cop"},{"name":"Ryan","profession":"sleuth"},{"name":"Sofia","profession":"guard"},{"name":"Terry","profession":"sleuth"},{"name":"Vicky","profession":"farmer"},{"name":"Wally","profession":"mech"},{"name":"Xavi","profession":"mech"},{"name":"Zara","profession":"mech"}]'
 
 
+def get_puzzle_urls(filename: str) -> list[str]:
+    urls = []
+
+    with open(filename) as file:
+        for line in file:
+            # ignore lines with only whitespace, strip out starting/trailing whitespace and newlines
+            cleaned_line = line.strip()
+            if cleaned_line:
+                urls.append(cleaned_line)
+    return urls
+
+
 def main():
+    puzzle_urls = get_puzzle_urls("puzzle_urls.txt")
+    for puzzle_url in puzzle_urls:
+        complete_puzzle(puzzle_url)
+
+    return
+
     input_data = PuzzleInput(
         suspects=json.loads(raw_input_data),
         starting_suspect_name="Frank",

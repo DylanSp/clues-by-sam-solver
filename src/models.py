@@ -26,6 +26,7 @@ class Column(IntEnum):
     C = 2
     D = 3
 
+    # TODO - replace by making this regular enum with capital letters as underlying values? (lower-case never seems to be used)
     @classmethod
     def parse(cls, input: str) -> "Column":
         match input:

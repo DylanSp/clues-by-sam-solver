@@ -1,5 +1,7 @@
 puzzle_urls.txt
 
+# recordings from Playwright auto-solving puzzles
+videos/
 
 
 # Byte-compiled / optimized / DLL files

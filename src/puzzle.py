@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Set, TypedDict
+from typing import Optional, Set
 from z3 import Solver, Bool, BoolRef, Not, And, Or, AtLeast, AtMost, If, Sum, sat, unsat
 
 from models import Column, Direction, Parity, Verdict
@@ -16,8 +16,8 @@ word_to_int: dict[str, int] = {
 }
 
 
-# TODO - potentially convert back to dataclass, let main driver handle parsing JSON into dataclasses
-class RawSuspect(TypedDict):
+@dataclass
+class RawSuspect:
     name: str
     profession: str
 
@@ -101,10 +101,10 @@ class Puzzle:
         idx = 0
         for suspect_data in input_data.suspects:
             suspect = PuzzleSuspect(
-                name=suspect_data["name"],
-                profession=suspect_data["profession"],
+                name=suspect_data.name,
+                profession=suspect_data.profession,
                 neighbors=set(),
-                is_innocent=Bool(suspect_data["name"]),
+                is_innocent=Bool(suspect_data.name),
                 row=(idx // NUM_COLS) + 1,  # convert to 1-based index
                 column=Column(idx % NUM_COLS),
             )

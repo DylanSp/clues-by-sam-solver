@@ -91,6 +91,7 @@ def complete_puzzle(url: str):
             print("Puzzle solved!")
         else:
             print("Puzzle unsolved, bug somewhere")
+        print()
 
         context.close()
         browser.close()

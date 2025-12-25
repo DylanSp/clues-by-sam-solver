@@ -1,5 +1,6 @@
 from collections import deque
 import json
+
 from models import Verdict
 from puzzle import Puzzle, PuzzleInput
 

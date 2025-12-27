@@ -7,3 +7,6 @@ install-deps:
 
 run:
     uv run src/main.py
+
+test:
+    uv run -m unittest

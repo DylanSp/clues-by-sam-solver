@@ -375,6 +375,18 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(
                     row_suspects & neighbors, int(num_suspects), verdict)
 
+            # TODO - does this need to have "is" | "are"? (if it does, probably add "innocents" | "criminals" to verdict_str)
+            # TODO - version for above/below
+            case ["Exactly", num_suspects, ("innocent" | "criminal") as verdict_str, "to", "the", ("left" | "right") as direction_str, "of", suspect_name, "is", "neighboring", "me"]:
+                direction = Direction(direction_str)
+                verdict = Verdict.parse(verdict_str)
+                direction_suspects = self._get_suspects_relative_to_other_suspect(
+                    suspect_name, direction)
+                neighbors = self.suspects[suspect_with_clue].neighbors
+
+                self._set_has_exactly_n_of_verdict(
+                    direction_suspects & neighbors, int(num_suspects), verdict)
+
             case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ("innocents" | "criminals") as verdict_str, ("above" | "below") as direction_str, suspect_name]:
                 direction = Direction(direction_str)
                 parity = Parity(parity_str)
@@ -688,7 +700,26 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(
                     central_suspect_neighbors, int(num_neighbors), verdict)
 
-                # second part - of those neighbors, num_neighbor_subset are neighbors of other_suspect, have that verdict
+                # second part - of those neighbors, num_neighbor_subset are neighbors of other_suspect with that verdict
+                neighbor_subset = central_suspect_neighbors & self.suspects[
+                    other_suspect_name].neighbors
+
+                self._set_has_exactly_n_of_verdict(
+                    neighbor_subset, int(num_neighbor_subset), verdict)
+
+            # TODO - should this be "is" | "are"? If num_neighbor_subset isn't 1, is the wording otherwise the same?
+            case ["Only", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict_str, "neighboring", central_suspect_name, "is", other_suspect_name, "neighbor"]:
+                verdict = Verdict.parse(verdict_str)
+                # other_suspect_name ends with 's, e.g. "Olof's"
+                other_suspect_name = other_suspect_name.removesuffix("'s")
+
+                # first part - central_suspect has num_neighbors with verdict
+                central_suspect_neighbors = self.suspects[central_suspect_name].neighbors
+
+                self._set_has_exactly_n_of_verdict(
+                    central_suspect_neighbors, int(num_neighbors), verdict)
+
+                # second part - of thise neighbors, num_neighbor_subset are neighbors of other_suspect with that verdict
                 neighbor_subset = central_suspect_neighbors & self.suspects[
                     other_suspect_name].neighbors
 
@@ -697,13 +728,21 @@ class Puzzle:
 
             # TODO - version of this for columns
             case ["An", ("odd" | "even") as parity_str, "number", "of", ("innocents" | "criminals") as verdict_str, "in", "row", row, "neighbor", suspect_name]:
-                neighbors = self.suspects[suspect_name].neighbors
-                row_suspects = self._row(int(row))
-                relevant_suspects = neighbors & row_suspects
                 parity = Parity(parity_str)
                 verdict = Verdict.parse(verdict_str)
+                neighbors = self.suspects[suspect_name].neighbors
+                row_suspects = self._row(int(row))
 
-                self._set_has_parity(relevant_suspects, parity, verdict)
+                self._set_has_parity(neighbors & row_suspects, parity, verdict)
+
+            # TODO - combine with above ("An odd/even number of innocents/criminals in row ROW neighbor SUSPECT")? Same logic, different wording
+            case ["There's", "an", ("odd" | "even") as parity_str, "number", "of", ("innocents" | "criminals") as verdict_str, "neighboring", suspect_name, "in", "row", row]:
+                parity = Parity(parity_str)
+                verdict = Verdict.parse(verdict_str)
+                neighbors = self.suspects[suspect_name].neighbors
+                row_suspects = self._row(int(row))
+
+                self._set_has_parity(neighbors & row_suspects, parity, verdict)
 
             case ["Column", column, "has", "more", ("innocents" | "criminals") as verdict_str, "than", "any", "other", "column"]:
                 self._column_has_most_of_verdict(
@@ -848,6 +887,14 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(
                     suspect1_neighbors & suspect2_neighbors, 2, verdict)
 
+            case ["There", "is", "only", "one", ("innocent" | "criminal") as verdict_str, "in", "between", suspect1_name, "and", suspect2_name]:
+                verdict = Verdict.parse(verdict_str)
+                suspects_between = self._between_suspects(
+                    suspect1_name, suspect2_name)
+
+                self._set_has_exactly_n_of_verdict(
+                    suspects_between, 1, verdict)
+
             case ["The", "only", ("innocent" | "criminal") as verdict_str, "in", "between", suspect1_name, "and", suspect2_name, "is", central_suspect_name, "neighbor"]:
                 # central_suspect_name has "'s" at the end, e.g. "Isaac's"
                 central_suspect_name = central_suspect_name.removesuffix("'s")
@@ -905,9 +952,9 @@ class Puzzle:
                     row_suspects, int(num_verdict), verdict)
 
                 # second part - there are exactly num_neighbors innocents/criminals in intersection of row and neighbors of suspect_with_clue
-                suspect_with_clue_neighbors = self.suspects[suspect_with_clue].neighbors
+                neighbors = self.suspects[suspect_with_clue].neighbors
                 self._set_has_exactly_n_of_verdict(
-                    row_suspects & suspect_with_clue_neighbors, int(num_neighbors), verdict)
+                    row_suspects & neighbors, int(num_neighbors), verdict)
 
             # TODO - version of this for "to the left/right"?
             case ["Both", ("innocents" | "criminals") as verdict_str, ("above" | "below") as direction_str, "me", "are", "connected"]:

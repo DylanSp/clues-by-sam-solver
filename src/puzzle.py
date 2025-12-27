@@ -240,91 +240,88 @@ class Puzzle:
                 self.solver.add(suspect_neighbor_count > other_neighbor_count)
 
     # checking for connection:
-    # "all innocents are connected" => no criminals in set have innocents to both sides (or vice versa for criminals)
+    # "all innocents are connected" => no criminals in set have innocents both somewhere on their left and somewhere on their right (or above/below for vertical sets)
     # so to assert this, for each suspect in set, either
     # a.) suspect has given verdict
-    # b.) suspect does not have given verdict AND does not have neighbors on both sides with given verdict
-    # we need two methods, one horizontal, one vertical, to govern which neighbors are checked
-
-    # TODO - problem
-    # this doesn't seem sufficient; issue with puzzle 1-5
-    # relevant suspects:
-    # row 1 - Alice, Brian, Chris, Donna
-    # row 2 - Ethan, Frank, Gus, Helen
-    # row 3 - Isaac, Kevin, Lisa, Martin
-    # knowledge:
-    # Kevin is innocent
-    # Lisa is criminal
-    # Gus has 5 criminal neighbors
-    # all criminals in row 1 are connected
-    # we *should* be able to conclude that Brian is criminal, but we currently don't
-    # possibly need to add constraints on suspects on end of row/column (here, Alice)
+    # b.) suspect does not have given verdict AND not (there's a suspect with given verdict somewhere on their left and a suspect with given verdict somewhere on their right)
+    # for suspects on ends of the set being checked, this vacuously holds - they don't have any suspects on one side
+    # we need two methods, one horizontal, one vertical, to govern which directions are checked
 
     def _all_suspects_in_horizontal_set_with_verdict_are_connected(self, suspects: set[PuzzleSuspect], verdict: Verdict):
         for suspect in suspects:
-            left_neighbor = suspect.neighbor_in_direction(Direction.LEFT)
-            right_neighbor = suspect.neighbor_in_direction(Direction.RIGHT)
+            # intersect with suspects so we only checking for connectedness within the set
+            left_suspects = suspects & self._get_suspects_relative_to_other_suspect(
+                suspect.name, Direction.LEFT)
+            right_suspects = suspects & self._get_suspects_relative_to_other_suspect(
+                suspect.name, Direction.RIGHT)
 
-            # make sure we're only checking for neighbors within the set
-            # this implicitly checks that left_neighbor/right_neighbor aren't None - `None in suspects` is false
-            if left_neighbor in suspects and right_neighbor in suspects:
-                if verdict == Verdict.INNOCENT:
-                    self.solver.add(
-                        Or(
-                            suspect.is_innocent,
-                            Not(
-                                And(
-                                    left_neighbor.is_innocent,
-                                    right_neighbor.is_innocent
-                                )
+            does_relevant_suspect_to_left_exist = count_suspects_with_verdict(
+                left_suspects, verdict) > 0
+            does_relevant_suspect_to_right_exist = count_suspects_with_verdict(
+                right_suspects, verdict) > 0
+
+            if verdict == Verdict.INNOCENT:
+                self.solver.add(
+                    Or(
+                        suspect.is_innocent,
+                        Not(
+                            And(
+                                does_relevant_suspect_to_left_exist,
+                                does_relevant_suspect_to_right_exist
                             )
                         )
                     )
-                elif verdict == Verdict.CRIMINAL:
-                    self.solver.add(
-                        Or(
-                            Not(suspect.is_innocent),
-                            Not(
-                                And(
-                                    Not(left_neighbor.is_innocent),
-                                    Not(right_neighbor.is_innocent)
-                                )
+                )
+            elif verdict == Verdict.CRIMINAL:
+                self.solver.add(
+                    Or(
+                        Not(suspect.is_innocent),
+                        Not(
+                            And(
+                                does_relevant_suspect_to_left_exist,
+                                does_relevant_suspect_to_right_exist
                             )
                         )
                     )
+                )
 
     def _all_suspects_in_vertical_set_with_verdict_are_connected(self, suspects: set[PuzzleSuspect], verdict: Verdict):
         for suspect in suspects:
-            above_neighbor = suspect.neighbor_in_direction(Direction.ABOVE)
-            below_neighbor = suspect.neighbor_in_direction(Direction.BELOW)
+            # intersect with suspects so we only checking for connectedness within the set
+            above_suspects = suspects & self._get_suspects_relative_to_other_suspect(
+                suspect.name, Direction.ABOVE)
+            below_suspects = suspects & self._get_suspects_relative_to_other_suspect(
+                suspect.name, Direction.BELOW)
 
-            # make sure we're only checking for neighbors within the set
-            # this implicitly checks that above_neighbor/below_neighbor aren't None - `None in suspects` is false
-            if above_neighbor in suspects and below_neighbor in suspects:
-                if verdict == Verdict.INNOCENT:
-                    self.solver.add(
-                        Or(
-                            suspect.is_innocent,
-                            Not(
-                                And(
-                                    above_neighbor.is_innocent,
-                                    below_neighbor.is_innocent
-                                )
+            does_relevant_suspect_above_exist = count_suspects_with_verdict(
+                above_suspects, verdict) > 0
+            does_relevant_suspect_below_exist = count_suspects_with_verdict(
+                below_suspects, verdict) > 0
+
+            if verdict == Verdict.INNOCENT:
+                self.solver.add(
+                    Or(
+                        suspect.is_innocent,
+                        Not(
+                            And(
+                                does_relevant_suspect_above_exist,
+                                does_relevant_suspect_below_exist
                             )
                         )
                     )
-                elif verdict == Verdict.CRIMINAL:
-                    self.solver.add(
-                        Or(
-                            Not(suspect.is_innocent),
-                            Not(
-                                And(
-                                    Not(above_neighbor.is_innocent),
-                                    Not(below_neighbor.is_innocent)
-                                )
+                )
+            elif verdict == Verdict.CRIMINAL:
+                self.solver.add(
+                    Or(
+                        Not(suspect.is_innocent),
+                        Not(
+                            And(
+                                does_relevant_suspect_above_exist,
+                                does_relevant_suspect_below_exist
                             )
                         )
                     )
+                )
 
     # methods for solving puzzle
 

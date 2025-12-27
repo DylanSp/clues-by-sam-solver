@@ -246,6 +246,20 @@ class Puzzle:
     # b.) suspect does not have given verdict AND does not have neighbors on both sides with given verdict
     # we need two methods, one horizontal, one vertical, to govern which neighbors are checked
 
+    # TODO - problem
+    # this doesn't seem sufficient; issue with puzzle 1-5
+    # relevant suspects:
+    # row 1 - Alice, Brian, Chris, Donna
+    # row 2 - Ethan, Frank, Gus, Helen
+    # row 3 - Isaac, Kevin, Lisa, Martin
+    # knowledge:
+    # Kevin is innocent
+    # Lisa is criminal
+    # Gus has 5 criminal neighbors
+    # all criminals in row 1 are connected
+    # we *should* be able to conclude that Brian is criminal, but we currently don't
+    # possibly need to add constraints on suspects on end of row/column (here, Alice)
+
     def _all_suspects_in_horizontal_set_with_verdict_are_connected(self, suspects: set[PuzzleSuspect], verdict: Verdict):
         for suspect in suspects:
             left_neighbor = suspect.neighbor_in_direction(Direction.LEFT)

@@ -10,7 +10,7 @@ def complete_puzzle(url: str):
     with sync_playwright() as p:
         browser = p.chromium.launch()
 
-        record_videos = True
+        record_videos = False
 
         if record_videos:
             # manually start a context so we can specify directory for videos

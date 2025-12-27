@@ -167,6 +167,13 @@ class Puzzle:
     def _edges(self) -> Set[PuzzleSuspect]:
         return self._row(1) | self._row(5) | self._column(Column.A) | self._column(Column.D)
 
+    def _corners(self) -> Set[PuzzleSuspect]:
+        top_left = self._row(1) & self._column(Column.A)
+        top_right = self._row(1) & self._column(Column.D)
+        bottom_left = self._row(5) & self._column(Column.A)
+        bottom_right = self._row(5) & self._column(Column.D)
+        return top_left | top_right | bottom_left | bottom_right
+
     def _between_suspects(self, suspect1_name: str, suspect2_name: str) -> Set[PuzzleSuspect]:
         suspect1 = self.suspects[suspect1_name]
         suspect2 = self.suspects[suspect2_name]
@@ -549,11 +556,28 @@ class Puzzle:
             case [suspect_name, "is", "one", "of", num_suspects_str, "or", "more", ("innocents" | "criminals") as verdict_str, "on", "the", "edges"]:
                 verdict = Verdict.parse(verdict_str)
                 num_suspects = word_to_int[num_suspects_str]
-                relevant_edge_suspects_count = count_suspects_with_verdict(
+
+                # first part - verdict for suspect_name
+                self._set_single_verdict(suspect_name, verdict)
+
+                # second part - edges have >= num_suspects of verdict
+                edge_suspects_count = count_suspects_with_verdict(
                     self._edges(), verdict)
 
+                self.solver.add(edge_suspects_count >= num_suspects)
+
+            case [suspect_name, "is", "one", "of", num_suspects_str, "or", "more", ("innocents" | "criminals") as verdict_str, "in", "a", "corner"]:
+                verdict = Verdict.parse(verdict_str)
+                num_suspects = word_to_int[num_suspects_str]
+
+                # first part - verdict for suspect_name
                 self._set_single_verdict(suspect_name, verdict)
-                self.solver.add(relevant_edge_suspects_count >= num_suspects)
+
+                # second part - corners have >= num_suspects of verdicts
+                corner_suspects_count = count_suspects_with_verdict(
+                    self._corners(), verdict)
+
+                self.solver.add(corner_suspects_count >= num_suspects)
 
             case [identified_suspect_name, "is", "one", "of", num_suspects_str, "or", "more", ("innocents" | "criminals") as verdict_str, ("above" | "below") as direction_str, central_suspect_name]:
                 verdict = Verdict.parse(verdict_str)
@@ -684,22 +708,38 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(
                     set(filtered_neighbors), int(num_of_profession), verdict)
 
-            # TODO - what's the exact wording for "to the left of/to the right of"? does that case happen?
+            # TODO - version for "to the left of/to the right of"
             case ["Exactly", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict_str, "neighboring", central_suspect_name, "are", ("above" | "below") as direction_str, other_suspect]:
                 verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
                 central_suspect_neighbors = self.suspects[central_suspect_name].neighbors
 
                 # first part - central_suspect has num_neighbors with verdict
                 self._set_has_exactly_n_of_verdict(
                     central_suspect_neighbors, int(num_neighbors), verdict)
 
-                # second part - of those neighbors, num_neighbor_subset in direction_str relative to other_suspect, have verdict
-                direction = Direction(direction_str)
+                # second part - of those neighbors, num_neighbor_subset are in direction_str relative to other_suspect and have verdict
                 neighbor_subset = central_suspect_neighbors & self._get_suspects_relative_to_other_suspect(
                     other_suspect, direction)
 
                 self._set_has_exactly_n_of_verdict(
                     neighbor_subset, int(num_neighbor_subset), verdict)
+
+            # TODO - version for above/below
+            case ["Neither", "of", "the", num_neighbors, ("innocents" | "criminals") as verdict_str, "neighboring", central_suspect_name, "are", "to", "the", ("left" | "right") as direction_str, "of", other_suspect]:
+                verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
+                central_suspect_neighbors = self.suspects[central_suspect_name].neighbors
+
+                # first part - central_suspect has num_neighbors with verdict
+                self._set_has_exactly_n_of_verdict(
+                    central_suspect_neighbors, int(num_neighbors), verdict)
+
+                # second part - of those neighbors, 0 are in direction_str relative to other_suspect and have verdict
+                neighbor_subset = central_suspect_neighbors & self._get_suspects_relative_to_other_suspect(
+                    other_suspect, direction)
+
+                self._set_has_exactly_n_of_verdict(neighbor_subset, 0, verdict)
 
             # TODO - should this be "is" | "are"? If num_neighbor_subset isn't 1, is the wording otherwise the same?
             case ["Only", num_neighbor_subset, "of", "the", num_neighbors, ("innocents" | "criminals") as verdict_str, "neighboring", central_suspect_name, "is", "in", "row", row]:

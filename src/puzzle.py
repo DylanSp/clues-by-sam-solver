@@ -488,6 +488,25 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(
                     suspect1_neighbors & suspect2_neighbors, 1, verdict)
 
+            # TODO - version for above/below
+            case [suspect1_name, "only", ("innocent" | "criminal") as verdict_str, "neighbor", "is", "to", "the", ("left" | "right") as direction_str, "of", suspect2_name]:
+                verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
+                # suspect1_name ends with 's, e.g. "Alice's"
+                suspect1_name = suspect1_name.removesuffix("'s")
+                suspect1_neighbors = self.suspects[suspect1_name].neighbors
+
+                # first part - suspect 1 has exactly 1 innocent/criminal neighbor
+                self._set_has_exactly_n_of_verdict(
+                    suspect1_neighbors, 1, verdict)
+
+                # second part - exactly 1 innocent criminal in intersection of suspect1_neighbors and suspects in direction of suspect 2
+                suspects_in_direction = self._get_suspects_relative_to_other_suspect(
+                    suspect2_name, direction)
+
+                self._set_has_exactly_n_of_verdict(
+                    suspect1_neighbors & suspects_in_direction, 1, verdict)
+
             case ["There", "is", "only", "one", ("innocent" | "criminal") as verdict_str, ("above" | "below") as direction_str, suspect_name]:
                 direction = Direction(direction_str)
                 verdict = Verdict.parse(verdict_str)
@@ -551,6 +570,20 @@ class Puzzle:
                     suspects_in_direction, verdict)
 
                 self.solver.add(suspects_in_direction_count >= num_suspects)
+
+            case [identified_suspect_name, "is", "one", "of", num_suspects, ("innocents" | "criminals") as verdict_str, "to", "the", ("left" | "right") as direction_str, "of", central_suspect_name]:
+                verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
+
+                # first part - verdict for identified suspect
+                self._set_single_verdict(identified_suspect_name, verdict)
+
+                # second part - suspects in direction have num_suspects of verdict
+                suspects_in_direction = self._get_suspects_relative_to_other_suspect(
+                    central_suspect_name, direction)
+
+                self._set_has_exactly_n_of_verdict(
+                    suspects_in_direction, int(num_suspects), verdict)
 
             case [identified_suspect_name, "is", "one", "of", num_suspects_str, "or", "more", ("innocents" | "criminals") as verdict_str, "to", "the", ("left" | "right") as direction_str, "of", central_suspect_name]:
                 verdict = Verdict.parse(verdict_str)

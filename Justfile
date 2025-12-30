@@ -10,3 +10,6 @@ run:
 
 test:
     uv run -m unittest
+
+clean-videos:
+    rm -f videos/*.webm

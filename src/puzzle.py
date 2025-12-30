@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Optional, Set
-from z3 import Solver, Bool, BoolRef, Not, And, Or, AtLeast, AtMost, If, Sum, sat, unsat
+
+from z3 import And, AtLeast, AtMost, Bool, BoolRef, If, Not, Or, Solver, Sum, sat, unsat
 
 from models import Column, Direction, Parity, Verdict
-
 
 NUM_ROWS = 5
 NUM_COLS = 4

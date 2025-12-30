@@ -1,9 +1,10 @@
 from collections import deque
 from typing import Tuple
+
 from playwright.sync_api import sync_playwright
 
-from puzzle import PuzzleInput, RawSuspect, Puzzle
 from models import Verdict
+from puzzle import Puzzle, PuzzleInput, RawSuspect
 
 
 def complete_puzzle(url: str):

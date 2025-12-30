@@ -29,19 +29,22 @@ def complete_puzzle(url: str):
         profession_elements = page.locator("css=p.profession")
         professions = profession_elements.all_inner_texts()
 
-        suspects = [RawSuspect(name, profession)
-                    for name, profession in zip(names, professions)]
+        suspects = [
+            RawSuspect(name, profession) for name, profession in zip(names, professions)
+        ]
 
         # get initial suspect
         starting_suspect_card = page.locator("css=div.card.flipped").first
         starting_suspect_name = starting_suspect_card.locator(
-            "css=h3.name").inner_text()
+            "css=h3.name"
+        ).inner_text()
 
         initial_clue = starting_suspect_card.locator("css=p.hint").inner_text()
 
-        starting_suspect_card_classes = starting_suspect_card.get_attribute(
-            "class")
-        assert starting_suspect_card_classes is not None, "Initial suspect card does not have any CSS classes specified"
+        starting_suspect_card_classes = starting_suspect_card.get_attribute("class")
+        assert starting_suspect_card_classes is not None, (
+            "Initial suspect card does not have any CSS classes specified"
+        )
         starting_suspect_card_classes = starting_suspect_card_classes.split()
         if "innocent" in starting_suspect_card_classes:
             starting_suspect_verdict = Verdict.INNOCENT
@@ -49,10 +52,12 @@ def complete_puzzle(url: str):
             starting_suspect_verdict = Verdict.CRIMINAL
         else:
             raise ValueError(
-                "Could not determine whether revealed suspect was innocent or criminal")
+                "Could not determine whether revealed suspect was innocent or criminal"
+            )
 
-        puzzle = Puzzle(PuzzleInput(
-            suspects, starting_suspect_name, starting_suspect_verdict))
+        puzzle = Puzzle(
+            PuzzleInput(suspects, starting_suspect_name, starting_suspect_verdict)
+        )
 
         unhandled_clues: deque[Tuple[str, str]] = deque()
         unhandled_clues.append((initial_clue, starting_suspect_name))
@@ -74,13 +79,11 @@ def complete_puzzle(url: str):
                 suspect_element.click()
 
                 # click "Innocent" or "Criminal" button
-                page.locator("css=.modal").get_by_text(
-                    str(solution.verdict)).click()
+                page.locator("css=.modal").get_by_text(str(solution.verdict)).click()
 
                 # check that we selected correct verdict - if we didn't, the "Not enough evidence!" warning modal will be displayed
                 warning_modals = page.locator("css=.modal.warning").all()
-                assert len(
-                    warning_modals) == 0, "Incorrect verdict clicked on page"
+                assert len(warning_modals) == 0, "Incorrect verdict clicked on page"
 
                 # get new clue
                 # using get_by_text() with suspect's name will drill down too far, to the <h3> with their name,

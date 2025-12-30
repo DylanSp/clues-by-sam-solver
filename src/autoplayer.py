@@ -65,9 +65,11 @@ def complete_puzzle(url: str):
             for solution in newly_solved_suspects:
                 print(f"{solution.name} is {solution.verdict}")
 
-                # use and_ to make sure we choose the card for the actual suspect, not another card mentioning that suspect in the clue
-                suspect_element = page.get_by_text(
-                    solution.name).and_(page.locator("h3.name"))
+                # the h3's with suspect names have the names as all lower-cased in the DOM;
+                # search for that with exact=True to avoid finding another card mentioning that suspect in the clue;
+                # also avoids matching another suspect whose name contains the name we're looking for (e.g. "Steve" when looking for "eve")
+                search_text = solution.name.lower()
+                suspect_element = page.get_by_text(search_text, exact=True)
                 # opens modal that allows identifying suspect as Innocent or Criminal
                 suspect_element.click()
 

@@ -1323,7 +1323,7 @@ class Puzzle:
 
             case [
                 identified_suspect_name,
-                "is",
+                "is" | "am",
                 "one",
                 "of",
                 central_suspect_name,
@@ -1331,15 +1331,15 @@ class Puzzle:
                 ("innocent" | "criminal") as verdict_str,
                 "neighbors",
             ]:
-                # can be "...is one of *my* innocent/criminal neighbors"
-                # check for that; if so, use suspect_with_clue
-                if central_suspect_name == "my":
-                    actual_central_suspect_name = suspect_with_clue
-                else:
-                    # original central_suspect_name ends with 's, e.g. "Helen's"
-                    actual_central_suspect_name = central_suspect_name.removesuffix(
-                        "'s"
-                    )
+                # can be "I am one of central_suspect_name's..."
+                if identified_suspect_name == "I":
+                    identified_suspect_name = suspect_with_clue
+                # can also be "...is one of *my* innocent/criminal neighbors"
+                elif central_suspect_name == "my":
+                    central_suspect_name = suspect_with_clue
+
+                # central_suspect_name ends with 's, e.g. "Helen's" (unless it's "my")
+                central_suspect_name = central_suspect_name.removesuffix("'s")
                 verdict = Verdict.parse(verdict_str)
 
                 # first part - verdict for identified suspect
@@ -1347,7 +1347,7 @@ class Puzzle:
 
                 # second part - central_suspect has num_suspects neighbors of verdict
                 central_suspect_neighbors = self.suspects[
-                    actual_central_suspect_name
+                    central_suspect_name
                 ].neighbors
 
                 self._set_has_exactly_n_of_verdict(
@@ -1724,8 +1724,19 @@ class Puzzle:
                     verdict,
                 )
 
-            # TODO - version of this for "above/below"
             case [
+                "Only",
+                num_neighbor_subset,
+                "of",
+                "the",
+                num_neighbors,
+                ("innocents" | "criminals") as verdict_str,
+                "neighboring",
+                central_suspect_name,
+                "is",
+                ("above" | "below") as direction_str,
+                other_suspect_name,
+            ] | [
                 "Only",
                 num_neighbor_subset,
                 "of",
@@ -1741,6 +1752,9 @@ class Puzzle:
                 "of",
                 other_suspect_name,
             ]:
+                if other_suspect_name == "me":
+                    other_suspect_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
                 direction = Direction(direction_str)
                 central_suspect_neighbors = self.suspects[
@@ -2234,6 +2248,31 @@ class Puzzle:
                 neighbor_suspects = self.suspects[suspect2_name].neighbors
                 self._set_has_exactly_n_of_verdict(
                     direction_suspects & neighbor_suspects, 2, verdict
+                )
+
+            case [
+                "The",
+                "only",
+                ("innocent" | "criminal") as verdict_str,
+                profession,
+                "is",
+                suspect_name,
+                "neighbor",
+            ]:
+                # original suspect_name has "'s" at the end, e.g. "Isaac's"
+                suspect_name = suspect_name.removesuffix("'s")
+                verdict = Verdict.parse(verdict_str)
+
+                # first part - exactly 1 of profession has verdict
+                profession_suspects = self._all_of_profession(profession)
+
+                self._set_has_exactly_n_of_verdict(profession_suspects, 1, verdict)
+
+                # second part - intersection of profession with suspect's neighbors has 1 of verdict
+                neighbors = self.suspects[suspect_name].neighbors
+
+                self._set_has_exactly_n_of_verdict(
+                    profession_suspects & neighbors, 1, verdict
                 )
 
             case [

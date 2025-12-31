@@ -92,8 +92,8 @@ def complete_puzzle(url: str):
                 # get new clue
                 # using get_by_text() with suspect's name will drill down too far, to the <h3> with their name,
                 # so instead, re-scan all flipped cards and look for the one with the right name
-                # TODO - possibly detect flavor text, don't add it to unhandled_clues
-                all_flipped_cards = page.locator("css=div.card.flipped")
+                # use .has-hint in the selector to skip cards with flavor text
+                all_flipped_cards = page.locator("css=div.card.flipped.has-hint")
                 for card in all_flipped_cards.all():
                     card_name = card.locator("css=h3.name").inner_text()
                     if card_name == solution.name:

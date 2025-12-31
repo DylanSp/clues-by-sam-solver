@@ -8,10 +8,12 @@ from puzzle import Puzzle, PuzzleInput, RawSuspect
 
 
 def complete_puzzle(url: str):
+    # Configuration
+    record_videos = False
+    regression_testing = False
+
     with sync_playwright() as p:
         browser = p.chromium.launch()
-
-        record_videos = False
 
         if record_videos:
             # manually start a context so we can specify directory for videos
@@ -69,7 +71,8 @@ def complete_puzzle(url: str):
             newly_solved_suspects = puzzle.add_clue(next_clue, source_suspect)
 
             for solution in newly_solved_suspects:
-                print(f"{solution.name} is {solution.verdict}")
+                if not regression_testing:
+                    print(f"{solution.name} is {solution.verdict}")
 
                 # the h3's with suspect names have the names as all lower-cased in the DOM;
                 # search for that with exact=True to avoid finding another card mentioning that suspect in the clue;
@@ -96,14 +99,20 @@ def complete_puzzle(url: str):
                     if card_name == solution.name:
                         clue = card.locator("css=p.hint").inner_text()
                         unhandled_clues.append((clue, solution.name))
-                        print(f"New clue from {solution.name}: {clue}")
+
+                        if not regression_testing:
+                            print(f"New clue from {solution.name}: {clue}")
+
                         break
 
-        if puzzle.is_solved():
-            print("Puzzle solved!")
+        if regression_testing:
+            assert puzzle.is_solved(), f"Puzzle from {url} remains unsolved"
         else:
-            print("Puzzle unsolved, bug somewhere")
-        print()
+            if puzzle.is_solved():
+                print("Puzzle solved!")
+            else:
+                print("Puzzle unsolved, bug somewhere")
+            print()
 
         context.close()
         browser.close()

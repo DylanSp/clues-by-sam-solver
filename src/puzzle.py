@@ -609,6 +609,9 @@ class Puzzle:
                 "neighboring",
                 suspect_name,
             ]:
+                if suspect_name == "me":
+                    suspect_name = suspect_with_clue
+
                 parity = Parity(parity_str)
                 verdict = Verdict.parse(verdict_str)
                 neighbors = self.suspects[suspect_name].neighbors
@@ -794,6 +797,9 @@ class Puzzle:
                 "in",
                 "common",
             ]:
+                if suspect2_name == "I":
+                    suspect2_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
                 suspect1_neighbors = self.suspects[suspect1_name].neighbors
                 suspect2_neighbors = self.suspects[suspect2_name].neighbors
@@ -1522,7 +1528,7 @@ class Puzzle:
                 num_of_profession,
                 profession_plural,
                 "have",
-                "a",
+                "a" | "an",
                 ("innocent" | "criminal") as verdict_str,
                 "directly",
                 ("above" | "below") as direction_str,
@@ -1705,6 +1711,9 @@ class Puzzle:
                 "row",
                 row,
             ]:
+                if central_suspect_name == "me":
+                    central_suspect_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
                 central_suspect_neighbors = self.suspects[
                     central_suspect_name
@@ -1805,6 +1814,37 @@ class Puzzle:
 
                 self._set_has_exactly_n_of_verdict(
                     row_suspects & neighbors, int(num_row_subset), verdict
+                )
+
+            case [
+                "Exactly",
+                num_edges_subset,
+                "of",
+                "the",
+                num_edges,
+                ("innocents" | "criminals") as verdict_str,
+                "on",
+                "the",
+                "edges",
+                "are",
+                suspect_name,
+                "neighbors",
+            ]:
+                # original suspect_name ends with 's, e.g. "Ollie's"
+                suspect_name = suspect_name.removesuffix("'s")
+                verdict = Verdict.parse(verdict_str)
+                edge_suspects = self._edges()
+
+                # first part - edges have num_edges suspects with verdict
+                self._set_has_exactly_n_of_verdict(
+                    edge_suspects, int(num_edges), verdict
+                )
+
+                # second part - intersection of edges and suspect's neighbors has num_edges_subset with verdict
+                neighbors = self.suspects[suspect_name].neighbors
+
+                self._set_has_exactly_n_of_verdict(
+                    edge_suspects & neighbors, int(num_edges_subset), verdict
                 )
 
             case [
@@ -1958,7 +1998,30 @@ class Puzzle:
 
                 self._set_has_parity(neighbors & row_suspects, parity, verdict)
 
-            # TODO - version of this for columns
+            case [
+                "There's",
+                "an",
+                "equal",
+                "number",
+                "of",
+                ("innocents" | "criminals") as verdict_str,
+                "in",
+                "columns",
+                column1,
+                "and",
+                column2,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                column1_count = count_suspects_with_verdict(
+                    self._column(Column.parse(column1)), verdict
+                )
+                column2_count = count_suspects_with_verdict(
+                    self._column(Column.parse(column2)), verdict
+                )
+
+                self.solver.add(column1_count == column2_count)
+
             case [
                 "There's",
                 "an",
@@ -2059,7 +2122,31 @@ class Puzzle:
                     case "criminal", "innocent":
                         self.solver.add(criminal_count > innocent_count)
 
-            # TODO - version of this for columns
+            case [
+                "There",
+                "are",
+                "more",
+                ("innocents" | "criminals") as more_verdict,
+                "than",
+                ("innocents" | "criminals") as less_verdict,
+                "in",
+                "column",
+                column,
+            ] if more_verdict != less_verdict:
+                column_suspects = self._column(Column.parse(column))
+                innocent_count = count_suspects_with_verdict(
+                    column_suspects, Verdict.INNOCENT
+                )
+                criminal_count = count_suspects_with_verdict(
+                    column_suspects, Verdict.CRIMINAL
+                )
+
+                match more_verdict, less_verdict:
+                    case "innocents", "criminals":
+                        self.solver.add(innocent_count > criminal_count)
+                    case "criminals", "innocents":
+                        self.solver.add(criminal_count > innocent_count)
+
             case [
                 "There",
                 "are",
@@ -2209,6 +2296,8 @@ class Puzzle:
             ]:
                 if more_suspect_name == "I":
                     more_suspect_name = suspect_with_clue
+                elif less_suspect_name == "me":
+                    less_suspect_name = suspect_with_clue
                 verdict = Verdict.parse(verdict_str)
                 more_suspect_neighbors = self.suspects[more_suspect_name].neighbors
                 more_suspect_neighbor_count = count_suspects_with_verdict(
@@ -2571,6 +2660,37 @@ class Puzzle:
                     row_suspects & neighbors, int(num_neighbors), verdict
                 )
 
+            case [
+                "Only",
+                num_column_subset,
+                "of",
+                "the",
+                num_column,
+                ("innocents" | "criminals") as verdict_str,
+                "in",
+                "column",
+                column,
+                "is" | "are",
+                "on",
+                "the",
+                "edges",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                # first part - there are num_column innocents/criminals in column
+                column_suspects = self._column(Column.parse(column))
+
+                self._set_has_exactly_n_of_verdict(
+                    column_suspects, int(num_column), verdict
+                )
+
+                # second part - there are num_column_subset innocents/criminals in intersection of column and edges
+                edge_suspects = self._edges()
+
+                self._set_has_exactly_n_of_verdict(
+                    column_suspects & edge_suspects, int(num_column_subset), verdict
+                )
+
             # TODO - version of this for "to the left/right"?
             case [
                 "Both",
@@ -2659,6 +2779,9 @@ class Puzzle:
                 "are",
                 "connected",
             ]:
+                if suspect_name == "me":
+                    suspect_name = suspect_with_clue
+
                 direction = Direction(direction_str)
                 verdict = Verdict.parse(verdict_str)
                 direction_suspects = self._get_suspects_relative_to_other_suspect(
@@ -2724,6 +2847,19 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(
                     neighbors, int(num_suspects), verdict
                 )
+
+            case [
+                suspect_name,
+                "has",
+                "only",
+                "one",
+                ("innocent" | "criminal") as verdict_str,
+                "neighbor",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+                neighbors = self.suspects[suspect_name].neighbors
+
+                self._set_has_exactly_n_of_verdict(neighbors, 1, verdict)
 
             # TODO - version of this for columns
             case [

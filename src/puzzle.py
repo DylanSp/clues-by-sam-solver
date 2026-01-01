@@ -53,10 +53,16 @@ class PuzzleSuspect:
                     if neighbor.column == self.column and neighbor.row == self.row + 1:
                         return neighbor
                 case Direction.LEFT:
-                    if neighbor.row == self.row and neighbor.column == self.column - 1:
+                    if (
+                        neighbor.row == self.row
+                        and int(neighbor.column) == int(self.column) - 1
+                    ):
                         return neighbor
                 case Direction.RIGHT:
-                    if neighbor.row == self.row and neighbor.column == self.column + 1:
+                    if (
+                        neighbor.row == self.row
+                        and int(neighbor.column) == int(self.column) + 1
+                    ):
                         return neighbor
         return None
 
@@ -105,7 +111,7 @@ class Puzzle:
                 neighbors=set(),
                 is_innocent=Bool(suspect_data.name),
                 row=(idx // NUM_COLS) + 1,  # convert to 1-based index
-                column=Column(idx % NUM_COLS),
+                column=Column.from_int(idx % NUM_COLS),
             )
             self.suspects[suspect.name] = suspect
             if suspect.name != input_data.starting_suspect_name:
@@ -186,7 +192,7 @@ class Puzzle:
                         suspect
                         for suspect in self.suspects.values()
                         if suspect.row == root_suspect.row
-                        and suspect.column < root_suspect.column
+                        and int(suspect.column) < int(root_suspect.column)
                     ]
                 )
             case Direction.RIGHT:
@@ -195,7 +201,7 @@ class Puzzle:
                         suspect
                         for suspect in self.suspects.values()
                         if suspect.row == root_suspect.row
-                        and suspect.column > root_suspect.column
+                        and int(suspect.column) > int(root_suspect.column)
                     ]
                 )
 
@@ -233,8 +239,8 @@ class Puzzle:
         suspect2 = self.suspects[suspect2_name]
 
         if suspect1.row == suspect2.row:
-            left_suspect = min(suspect1, suspect2, key=lambda s: s.column)
-            right_suspect = max(suspect1, suspect2, key=lambda s: s.column)
+            left_suspect = min(suspect1, suspect2, key=lambda s: int(s.column))
+            right_suspect = max(suspect1, suspect2, key=lambda s: int(s.column))
 
             return self._get_suspects_relative_to_other_suspect(
                 left_suspect.name, Direction.RIGHT
@@ -485,7 +491,7 @@ class Puzzle:
                     suspect_name = suspect_with_clue
 
                 verdict = Verdict.parse(verdict_str)
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
                 neighbors = self.suspects[suspect_name].neighbors
 
                 self._set_has_exactly_n_of_verdict(
@@ -1012,7 +1018,7 @@ class Puzzle:
                 "column",
                 column,
             ]:
-                neighbor_subset = self._column(Column.parse(column))
+                neighbor_subset = self._column(Column(column))
                 verdict = Verdict.parse(verdict_str)
 
                 self._set_single_verdict(suspect_name, verdict)
@@ -1050,7 +1056,7 @@ class Puzzle:
                 column,
             ]:
                 self._set_has_exactly_n_of_verdict(
-                    self._column(Column.parse(column)), 1, Verdict.parse(verdict_str)
+                    self._column(Column(column)), 1, Verdict.parse(verdict_str)
                 )
 
             case [
@@ -1078,7 +1084,7 @@ class Puzzle:
                 column,
             ]:
                 verdict = Verdict.parse(verdict_str)
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
 
                 self._set_has_exactly_n_of_verdict(
                     column_suspects, int(num_suspects), verdict
@@ -1122,7 +1128,7 @@ class Puzzle:
 
                 # second part - column has >= num_suspects of verdict
                 column_suspects_count = count_suspects_with_verdict(
-                    self._column(Column.parse(column)), verdict
+                    self._column(Column(column)), verdict
                 )
 
                 self.solver.add(column_suspects_count >= num_suspects)
@@ -1688,7 +1694,7 @@ class Puzzle:
                 )
 
                 # second part - of those neighbors, num_neighbor_subset are in row
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
 
                 self._set_has_exactly_n_of_verdict(
                     central_suspect_neighbors & column_suspects,
@@ -1963,7 +1969,7 @@ class Puzzle:
                 parity = Parity(parity_str)
                 verdict = Verdict.parse(verdict_str)
                 neighbors = self.suspects[suspect_name].neighbors
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
 
                 self._set_has_parity(neighbors & column_suspects, parity, verdict)
 
@@ -2014,10 +2020,10 @@ class Puzzle:
                 verdict = Verdict.parse(verdict_str)
 
                 column1_count = count_suspects_with_verdict(
-                    self._column(Column.parse(column1)), verdict
+                    self._column(Column(column1)), verdict
                 )
                 column2_count = count_suspects_with_verdict(
-                    self._column(Column.parse(column2)), verdict
+                    self._column(Column(column2)), verdict
                 )
 
                 self.solver.add(column1_count == column2_count)
@@ -2053,7 +2059,7 @@ class Puzzle:
                 "column",
             ]:
                 self._column_has_most_of_verdict(
-                    Column.parse(column), Verdict.parse(verdict_str)
+                    Column(column), Verdict.parse(verdict_str)
                 )
 
             case [
@@ -2133,7 +2139,7 @@ class Puzzle:
                 "column",
                 column,
             ] if more_verdict != less_verdict:
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
                 innocent_count = count_suspects_with_verdict(
                     column_suspects, Verdict.INNOCENT
                 )
@@ -2533,7 +2539,7 @@ class Puzzle:
                 # original suspect_name has "'s" at the end, e.g. "Isaac's"
                 suspect_name = suspect_name.removesuffix("'s")
                 verdict = Verdict.parse(verdict_str)
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
 
                 # first part - there are exactly 2 innocents/criminals in column
                 self._set_has_exactly_n_of_verdict(column_suspects, 2, verdict)
@@ -2614,7 +2620,7 @@ class Puzzle:
 
                 # original suspect_name ends with 's, e.g. "David's" (unless it was "my", but then removesuffix is a harmless no-op)
                 suspect_name = suspect_name.removesuffix("'s")
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
 
                 # first part - there are exactly num_verdict innocents/criminals in column
                 self._set_has_exactly_n_of_verdict(
@@ -2678,7 +2684,7 @@ class Puzzle:
                 verdict = Verdict.parse(verdict_str)
 
                 # first part - there are num_column innocents/criminals in column
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
 
                 self._set_has_exactly_n_of_verdict(
                     column_suspects, int(num_column), verdict
@@ -2748,7 +2754,7 @@ class Puzzle:
                 "connected",
             ]:
                 verdict = Verdict.parse(verdict_str)
-                column_suspects = self._column(Column.parse(column))
+                column_suspects = self._column(Column(column))
 
                 self._all_suspects_in_vertical_set_with_verdict_are_connected(
                     column_suspects, verdict

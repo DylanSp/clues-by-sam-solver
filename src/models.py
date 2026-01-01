@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum
+from enum import Enum
 
 
 class Verdict(Enum):
@@ -19,27 +19,37 @@ class Verdict(Enum):
         raise ValueError(f"{input} is not a valid verdict")
 
 
-# IntEnum so we can set column numerically when setting up the grid of suspects
-class Column(IntEnum):
-    A = 0
-    B = 1
-    C = 2
-    D = 3
+class Column(Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+    D = "D"
 
-    # TODO - replace by making this regular enum with capital letters as underlying values? (lower-case never seems to be used)
+    def __int__(self) -> int:
+        match self:
+            case Column.A:
+                return 0
+            case Column.B:
+                return 1
+            case Column.C:
+                return 2
+            case Column.D:
+                return 3
+
+    # Used when setting up the grid of suspects
     @classmethod
-    def parse(cls, input: str) -> "Column":
+    def from_int(cls, input: int) -> "Column":
         match input:
-            case "A" | "a":
+            case 0:
                 return Column.A
-            case "B" | "b":
+            case 1:
                 return Column.B
-            case "C" | "c":
+            case 2:
                 return Column.C
-            case "D" | "d":
+            case 3:
                 return Column.D
 
-        raise ValueError(f"{input} is not a valid column")
+        raise ValueError(f"{input} is not a valid column number")
 
 
 class Direction(Enum):

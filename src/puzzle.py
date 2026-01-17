@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Set
 
-from z3 import And, AtLeast, AtMost, Bool, BoolRef, If, Not, Or, Solver, Sum, sat, unsat
+from z3 import And, Bool, BoolRef, If, Not, Or, Solver, Sum, sat, unsat
 
 from models import Column, Direction, Parity, Verdict
 
@@ -266,13 +266,8 @@ class Puzzle:
     def _set_has_exactly_n_of_verdict(
         self, suspects: set[PuzzleSuspect], num_of_verdict: int, verdict: Verdict
     ):
-        if verdict == Verdict.INNOCENT:
-            refs = [suspect.is_innocent for suspect in suspects]
-        elif verdict == Verdict.CRIMINAL:
-            refs = [Not(suspect.is_innocent) for suspect in suspects]
-
-        self.solver.add(AtLeast(*refs, num_of_verdict))
-        self.solver.add(AtMost(*refs, num_of_verdict))
+        count = count_suspects_with_verdict(suspects, verdict)
+        self.solver.add(count == num_of_verdict)
 
     def _set_single_verdict(self, suspect_name: str, verdict: Verdict):
         """

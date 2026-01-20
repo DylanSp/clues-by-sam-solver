@@ -12,7 +12,6 @@ word_to_int: dict[str, int] = {
     "one": 1,
     "two": 2,
     "three": 3,
-    # TODO - fill out as needed
 }
 
 

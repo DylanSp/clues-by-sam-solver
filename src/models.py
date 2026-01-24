@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -62,3 +63,16 @@ class Direction(Enum):
 class Parity(Enum):
     ODD = "odd"
     EVEN = "even"
+
+
+@dataclass
+class RawSuspect:
+    name: str
+    profession: str
+
+
+@dataclass
+class PuzzleInput:
+    suspects: list[RawSuspect]  # assumed to be sorted
+    starting_suspect_name: str
+    starting_suspect_verdict: Verdict

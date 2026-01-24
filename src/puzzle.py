@@ -3,7 +3,7 @@ from typing import Optional, Set
 
 from z3 import And, Bool, BoolRef, If, Not, Or, Solver, Sum, sat, unsat
 
-from models import Column, Direction, Parity, Verdict
+from models import Column, Direction, Parity, PuzzleInput, Verdict
 
 NUM_ROWS = 5
 NUM_COLS = 4
@@ -13,19 +13,6 @@ word_to_int: dict[str, int] = {
     "two": 2,
     "three": 3,
 }
-
-
-@dataclass
-class RawSuspect:
-    name: str
-    profession: str
-
-
-@dataclass
-class PuzzleInput:
-    suspects: list[RawSuspect]  # assumed to be sorted
-    starting_suspect_name: str
-    starting_suspect_verdict: Verdict
 
 
 # all the data on a suspect that the Puzzle engine needs, including location, neighbors, and a Z3 BoolRef for tracking deduced verdict

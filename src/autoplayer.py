@@ -3,8 +3,8 @@ from typing import Tuple
 
 from playwright.sync_api import sync_playwright
 
-from models import Verdict
-from puzzle import Puzzle, PuzzleInput, RawSuspect
+from models import PuzzleInput, RawSuspect, Verdict
+from puzzle import Puzzle
 
 
 def complete_puzzle(url: str):

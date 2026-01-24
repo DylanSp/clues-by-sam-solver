@@ -36,6 +36,7 @@ class PuzzleSuspect:
     row: int
     column: Column
     neighbors: Set["PuzzleSuspect"]
+    all_other_suspects: Set["PuzzleSuspect"]
     is_innocent: BoolRef  # Z3 expression - true iff suspect is innocent
 
     # Names are unique and immutable, so can be used for equality testing; can't use default hash because Sets aren't hashable
@@ -65,6 +66,43 @@ class PuzzleSuspect:
                         return neighbor
         return None
 
+    def suspects_in_direction(self, direction: Direction) -> Set["PuzzleSuspect"]:
+        match direction:
+            case Direction.ABOVE:
+                return set(
+                    [
+                        suspect
+                        for suspect in self.all_other_suspects
+                        if suspect.column == self.column and suspect.row < self.row
+                    ]
+                )
+            case Direction.BELOW:
+                return set(
+                    [
+                        suspect
+                        for suspect in self.all_other_suspects
+                        if suspect.column == self.column and suspect.row > self.row
+                    ]
+                )
+            case Direction.LEFT:
+                return set(
+                    [
+                        suspect
+                        for suspect in self.all_other_suspects
+                        if suspect.row == self.row
+                        and int(suspect.column) < int(self.column)
+                    ]
+                )
+            case Direction.RIGHT:
+                return set(
+                    [
+                        suspect
+                        for suspect in self.all_other_suspects
+                        if suspect.row == self.row
+                        and int(suspect.column) > int(self.column)
+                    ]
+                )
+
     # Fast __repr__ method to allow debugging without needing to calculate repr for Z3 values
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} at {hex(id(self))}"
@@ -93,6 +131,7 @@ class Puzzle:
             name="dummy",
             profession="none",
             neighbors=set(),
+            all_other_suspects=set(),
             is_innocent=Bool("dummy"),
             row=1,
             column=Column.A,
@@ -108,6 +147,7 @@ class Puzzle:
                 name=suspect_data.name,
                 profession=suspect_data.profession,
                 neighbors=set(),
+                all_other_suspects=set(),
                 is_innocent=Bool(suspect_data.name),
                 row=(idx // NUM_COLS) + 1,  # convert to 1-based index
                 column=Column.from_int(idx % NUM_COLS),
@@ -121,10 +161,15 @@ class Puzzle:
 
             idx += 1
 
-        # set up suspects' neighbors
+        # set up suspects' neighbors and references to all_other_suspects
         for row in range(NUM_ROWS):
             for col in range(NUM_COLS):
                 suspect = grid[row][col]
+
+                suspect.all_other_suspects = set(
+                    [s for s in self.suspects.values() if s != suspect]
+                )
+
                 for dx in range(-1, 2):
                     for dy in range(-1, 2):
                         if dx == 0 and dy == 0:
@@ -161,48 +206,6 @@ class Puzzle:
                 if suspect.column == column_name
             ]
         )
-
-    def _get_suspects_relative_to_other_suspect(
-        self, root_suspect_name: str, direction: Direction
-    ) -> Set[PuzzleSuspect]:
-        root_suspect = self.suspects[root_suspect_name]
-        match direction:
-            case Direction.ABOVE:
-                return set(
-                    [
-                        suspect
-                        for suspect in self.suspects.values()
-                        if suspect.column == root_suspect.column
-                        and suspect.row < root_suspect.row
-                    ]
-                )
-            case Direction.BELOW:
-                return set(
-                    [
-                        suspect
-                        for suspect in self.suspects.values()
-                        if suspect.column == root_suspect.column
-                        and suspect.row > root_suspect.row
-                    ]
-                )
-            case Direction.LEFT:
-                return set(
-                    [
-                        suspect
-                        for suspect in self.suspects.values()
-                        if suspect.row == root_suspect.row
-                        and int(suspect.column) < int(root_suspect.column)
-                    ]
-                )
-            case Direction.RIGHT:
-                return set(
-                    [
-                        suspect
-                        for suspect in self.suspects.values()
-                        if suspect.row == root_suspect.row
-                        and int(suspect.column) > int(root_suspect.column)
-                    ]
-                )
 
     def _all_profession_types(self) -> Set[str]:
         return set([suspect.profession for suspect in self.suspects.values()])
@@ -241,20 +244,16 @@ class Puzzle:
             left_suspect = min(suspect1, suspect2, key=lambda s: int(s.column))
             right_suspect = max(suspect1, suspect2, key=lambda s: int(s.column))
 
-            return self._get_suspects_relative_to_other_suspect(
-                left_suspect.name, Direction.RIGHT
-            ) & self._get_suspects_relative_to_other_suspect(
-                right_suspect.name, Direction.LEFT
-            )
+            return left_suspect.suspects_in_direction(
+                Direction.RIGHT
+            ) & right_suspect.suspects_in_direction(Direction.LEFT)
         elif suspect1.column == suspect2.column:
             top_suspect = min(suspect1, suspect2, key=lambda s: s.row)
             bottom_suspect = max(suspect1, suspect2, key=lambda s: s.row)
 
-            return self._get_suspects_relative_to_other_suspect(
-                top_suspect.name, Direction.BELOW
-            ) & self._get_suspects_relative_to_other_suspect(
-                bottom_suspect.name, Direction.ABOVE
-            )
+            return top_suspect.suspects_in_direction(
+                Direction.BELOW
+            ) & bottom_suspect.suspects_in_direction(Direction.ABOVE)
         else:
             raise ValueError(
                 f"{suspect1_name} and {suspect2_name} are not in the same row or column; cannot check for suspects between them"
@@ -342,13 +341,9 @@ class Puzzle:
         self, suspects: set[PuzzleSuspect], verdict: Verdict
     ):
         for suspect in suspects:
-            # intersect with suspects so we only checking for connectedness within the set
-            left_suspects = suspects & self._get_suspects_relative_to_other_suspect(
-                suspect.name, Direction.LEFT
-            )
-            right_suspects = suspects & self._get_suspects_relative_to_other_suspect(
-                suspect.name, Direction.RIGHT
-            )
+            # intersect with suspects so we only check for connectedness within the set
+            left_suspects = suspects & suspect.suspects_in_direction(Direction.LEFT)
+            right_suspects = suspects & suspect.suspects_in_direction(Direction.RIGHT)
 
             does_relevant_suspect_to_left_exist = (
                 count_suspects_with_verdict(left_suspects, verdict) > 0
@@ -386,13 +381,9 @@ class Puzzle:
         self, suspects: set[PuzzleSuspect], verdict: Verdict
     ):
         for suspect in suspects:
-            # intersect with suspects so we only checking for connectedness within the set
-            above_suspects = suspects & self._get_suspects_relative_to_other_suspect(
-                suspect.name, Direction.ABOVE
-            )
-            below_suspects = suspects & self._get_suspects_relative_to_other_suspect(
-                suspect.name, Direction.BELOW
-            )
+            # intersect with suspects so we only check for connectedness within the set
+            above_suspects = suspects & suspect.suspects_in_direction(Direction.ABOVE)
+            below_suspects = suspects & suspect.suspects_in_direction(Direction.BELOW)
 
             does_relevant_suspect_above_exist = (
                 count_suspects_with_verdict(above_suspects, verdict) > 0
@@ -560,13 +551,13 @@ class Puzzle:
 
                 direction = Direction(direction_str)
                 verdict = Verdict.parse(verdict_str)
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect1_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    suspect1_name
+                ].suspects_in_direction(direction)
                 neighbors = self.suspects[suspect2_name].neighbors
 
                 self._set_has_exactly_n_of_verdict(
-                    direction_suspects & neighbors, int(num_suspects), verdict
+                    suspects_in_direction & neighbors, int(num_suspects), verdict
                 )
 
             case [
@@ -611,9 +602,9 @@ class Puzzle:
                 direction = Direction(direction_str)
                 parity = Parity(parity_str)
                 verdict = Verdict.parse(verdict_str)
-                suspects_in_direction = self._get_suspects_relative_to_other_suspect(
-                    suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    suspect_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_parity(suspects_in_direction, parity, verdict)
 
@@ -746,12 +737,12 @@ class Puzzle:
                 parity = Parity(parity_str)
                 verdict = Verdict.parse(verdict_str)
                 direction = Direction(direction_str)
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    root_suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    root_suspect_name
+                ].suspects_in_direction(direction)
                 neighbors = self.suspects[suspect_with_neighbors].neighbors
 
-                self._set_has_parity(direction_suspects & neighbors, parity, verdict)
+                self._set_has_parity(suspects_in_direction & neighbors, parity, verdict)
 
             case [
                 suspect1_name,
@@ -954,9 +945,9 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(suspect1_neighbors, 1, verdict)
 
                 # second part - exactly 1 innocent criminal in intersection of suspect1_neighbors and suspects in direction of suspect 2
-                suspects_in_direction = self._get_suspects_relative_to_other_suspect(
-                    suspect2_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    suspect2_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_exactly_n_of_verdict(
                     suspect1_neighbors & suspects_in_direction, 1, verdict
@@ -1058,9 +1049,9 @@ class Puzzle:
 
                 direction = Direction(direction_str)
                 verdict = Verdict.parse(verdict_str)
-                suspects_in_direction = self._get_suspects_relative_to_other_suspect(
-                    suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    suspect_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_exactly_n_of_verdict(suspects_in_direction, 1, verdict)
 
@@ -1088,9 +1079,9 @@ class Puzzle:
             ]:
                 direction = Direction(direction_str)
                 verdict = Verdict.parse(verdict_str)
-                suspects_in_direction = self._get_suspects_relative_to_other_suspect(
-                    suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    suspect_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_exactly_n_of_verdict(
                     suspects_in_direction, int(num_suspects), verdict
@@ -1385,9 +1376,9 @@ class Puzzle:
 
                 # second part - suspects in direction have >= num_suspects of verdict
                 num_suspects = word_to_int[num_suspects_str]
-                suspects_in_direction = self._get_suspects_relative_to_other_suspect(
-                    central_suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    central_suspect_name
+                ].suspects_in_direction(direction)
                 suspects_in_direction_count = count_suspects_with_verdict(
                     suspects_in_direction, verdict
                 )
@@ -1426,9 +1417,9 @@ class Puzzle:
                 self._set_single_verdict(identified_suspect_name, verdict)
 
                 # second part - suspects in direction have num_suspects of verdict
-                suspects_in_direction = self._get_suspects_relative_to_other_suspect(
-                    central_suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    central_suspect_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_exactly_n_of_verdict(
                     suspects_in_direction, int(num_suspects), verdict
@@ -1680,7 +1671,7 @@ class Puzzle:
                 central_suspect_name,
                 "are",
                 ("above" | "below") as direction_str,
-                other_suspect,
+                other_suspect_name,
             ]:
                 verdict = Verdict.parse(verdict_str)
                 direction = Direction(direction_str)
@@ -1694,12 +1685,9 @@ class Puzzle:
                 )
 
                 # second part - of those neighbors, num_neighbor_subset are in direction_str relative to other_suspect and have verdict
-                neighbor_subset = (
-                    central_suspect_neighbors
-                    & self._get_suspects_relative_to_other_suspect(
-                        other_suspect, direction
-                    )
-                )
+                neighbor_subset = central_suspect_neighbors & self.suspects[
+                    other_suspect_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_exactly_n_of_verdict(
                     neighbor_subset, int(num_neighbor_subset), verdict
@@ -1715,7 +1703,7 @@ class Puzzle:
                 central_suspect_name,
                 "are",
                 ("above" | "below") as direction_str,
-                other_suspect,
+                other_suspect_name,
             ] | [
                 "Neither",
                 "of",
@@ -1729,7 +1717,7 @@ class Puzzle:
                 "the",
                 ("left" | "right") as direction_str,
                 "of",
-                other_suspect,
+                other_suspect_name,
             ]:
                 verdict = Verdict.parse(verdict_str)
                 direction = Direction(direction_str)
@@ -1743,12 +1731,9 @@ class Puzzle:
                 )
 
                 # second part - of those neighbors, 0 are in direction_str relative to other_suspect and have verdict
-                neighbor_subset = (
-                    central_suspect_neighbors
-                    & self._get_suspects_relative_to_other_suspect(
-                        other_suspect, direction
-                    )
-                )
+                neighbor_subset = central_suspect_neighbors & self.suspects[
+                    other_suspect_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_exactly_n_of_verdict(neighbor_subset, 0, verdict)
 
@@ -1955,12 +1940,12 @@ class Puzzle:
                 )
 
                 # second part - of those neighbors, num_neighbor_subset are in direction_str relative to other_suspect
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    other_suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    other_suspect_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_exactly_n_of_verdict(
-                    central_suspect_neighbors & direction_suspects,
+                    central_suspect_neighbors & suspects_in_direction,
                     int(num_neighbor_subset),
                     verdict,
                 )
@@ -2001,19 +1986,19 @@ class Puzzle:
                 other_suspect_name = other_suspect_name.removesuffix("'s")
 
                 # first part - there are num_direction innocents/criminals in direction relative to root_suspect
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    root_suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    root_suspect_name
+                ].suspects_in_direction(direction)
 
                 self._set_has_exactly_n_of_verdict(
-                    direction_suspects, int(num_direction), verdict
+                    suspects_in_direction, int(num_direction), verdict
                 )
 
                 # second part - of those suspects, num_direction_subset are neighbors of other_suspect
                 neighbor_suspects = self.suspects[other_suspect_name].neighbors
 
                 self._set_has_exactly_n_of_verdict(
-                    direction_suspects & neighbor_suspects,
+                    suspects_in_direction & neighbor_suspects,
                     int(num_direction_subset),
                     verdict,
                 )
@@ -2539,17 +2524,19 @@ class Puzzle:
                 "of",
                 suspect_name,
             ] if more_verdict != less_verdict:
+                direction = Direction(direction_str)
+
                 if suspect_name == "me":
                     suspect_name = suspect_with_clue
 
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect_name, Direction(direction_str)
-                )
+                suspects_in_direction = self.suspects[
+                    suspect_name
+                ].suspects_in_direction(direction)
                 innocent_count = count_suspects_with_verdict(
-                    direction_suspects, Verdict.INNOCENT
+                    suspects_in_direction, Verdict.INNOCENT
                 )
                 criminal_count = count_suspects_with_verdict(
-                    direction_suspects, Verdict.CRIMINAL
+                    suspects_in_direction, Verdict.CRIMINAL
                 )
 
                 match more_verdict, less_verdict:
@@ -2601,14 +2588,14 @@ class Puzzle:
                 suspect_name,
             ] if verdict_str1 != verdict_str2:
                 direction = Direction(direction_str)
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    suspect_name
+                ].suspects_in_direction(direction)
                 innocent_count = count_suspects_with_verdict(
-                    direction_suspects, Verdict.INNOCENT
+                    suspects_in_direction, Verdict.INNOCENT
                 )
                 criminal_count = count_suspects_with_verdict(
-                    direction_suspects, Verdict.CRIMINAL
+                    suspects_in_direction, Verdict.CRIMINAL
                 )
 
                 self.solver.add(innocent_count == criminal_count)
@@ -2708,15 +2695,16 @@ class Puzzle:
                 direction = Direction(direction_str)
 
                 # first part - there are exactly two innocents/criminals in direction_str relative to suspect1
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect1_name, direction
-                )
-                self._set_has_exactly_n_of_verdict(direction_suspects, 2, verdict)
+                suspects_in_direction = self.suspects[
+                    suspect1_name
+                ].suspects_in_direction(direction)
 
-                # second part - there are exactly two innocent/criminals in intersection of direction_suspects and neighbors of suspect2
+                self._set_has_exactly_n_of_verdict(suspects_in_direction, 2, verdict)
+
+                # second part - there are exactly two innocent/criminals in intersection of suspects_in_direction and neighbors of suspect2
                 neighbor_suspects = self.suspects[suspect2_name].neighbors
                 self._set_has_exactly_n_of_verdict(
-                    direction_suspects & neighbor_suspects, 2, verdict
+                    suspects_in_direction & neighbor_suspects, 2, verdict
                 )
 
             case [
@@ -2772,15 +2760,17 @@ class Puzzle:
                 direction = Direction(direction_str)
 
                 # first part - there is exactly one innocent/criminal in direction_str relative to suspect1
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect1_name, direction
-                )
-                self._set_has_exactly_n_of_verdict(direction_suspects, 1, verdict)
+                suspects_in_direction = self.suspects[
+                    suspect1_name
+                ].suspects_in_direction(direction)
 
-                # second part - there is exactly one innocent/criminal in intersection of direction_suspects and neighbors of suspect2
+                self._set_has_exactly_n_of_verdict(suspects_in_direction, 1, verdict)
+
+                # second part - there is exactly one innocent/criminal in intersection of suspects_in_direction and neighbors of suspect2
                 neighbor_suspects = self.suspects[suspect2_name].neighbors
+
                 self._set_has_exactly_n_of_verdict(
-                    direction_suspects & neighbor_suspects, 1, verdict
+                    suspects_in_direction & neighbor_suspects, 1, verdict
                 )
 
             # TODO - version for above/below?
@@ -2805,18 +2795,19 @@ class Puzzle:
                 direction2 = Direction(direction2_str)
 
                 # first part - there is exactly one innocent/criminal in direction1 relative to suspect1
-                direction1_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect1_name, direction1
-                )
-                self._set_has_exactly_n_of_verdict(direction1_suspects, 1, verdict)
+                suspects_in_direction1 = self.suspects[
+                    suspect1_name
+                ].suspects_in_direction(direction1)
 
-                # second part - there is exactly one innocent/criminal in intersection of direction_suspects and in direction2 relative to suspect2
-                direction2_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect2_name, direction2
-                )
+                self._set_has_exactly_n_of_verdict(suspects_in_direction1, 1, verdict)
+
+                # second part - there is exactly one innocent/criminal in intersection of suspects_in_direction1 and in direction2 relative to suspect2
+                suspects_in_direction2 = self.suspects[
+                    suspect2_name
+                ].suspects_in_direction(direction2)
 
                 self._set_has_exactly_n_of_verdict(
-                    direction1_suspects & direction2_suspects, 1, verdict
+                    suspects_in_direction1 & suspects_in_direction2, 1, verdict
                 )
 
             case [
@@ -2833,18 +2824,20 @@ class Puzzle:
                 direction2 = Direction(direction2_str)
 
                 # first part - exactly 2 innocents/criminals above/below suspect1
-                suspects1 = self._get_suspects_relative_to_other_suspect(
-                    suspect1_name, direction1
-                )
+                suspects_in_direction1 = self.suspects[
+                    suspect1_name
+                ].suspects_in_direction(direction1)
 
-                self._set_has_exactly_n_of_verdict(suspects1, 2, verdict)
+                self._set_has_exactly_n_of_verdict(suspects_in_direction1, 2, verdict)
 
                 # second part - exactly 2 innocents/criminals above/below suspect1 *and* above/below suspect2
-                suspects2 = self._get_suspects_relative_to_other_suspect(
-                    suspect2_name, direction2
-                )
+                suspects_in_direction2 = self.suspects[
+                    suspect2_name
+                ].suspects_in_direction(direction2)
 
-                self._set_has_exactly_n_of_verdict(suspects1 & suspects2, 2, verdict)
+                self._set_has_exactly_n_of_verdict(
+                    suspects_in_direction1 & suspects_in_direction2, 2, verdict
+                )
 
             case [
                 "Both",
@@ -3157,14 +3150,14 @@ class Puzzle:
                 direction = Direction(direction_str)
 
                 # first part - there are exactly two innocents/criminals in direction_str relative to suspect
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect_name, direction
-                )
-                self._set_has_exactly_n_of_verdict(direction_suspects, 2, verdict)
+                suspects_in_direction = self.suspects[
+                    suspect_name
+                ].suspects_in_direction(direction)
+                self._set_has_exactly_n_of_verdict(suspects_in_direction, 2, verdict)
 
                 # second part - all innocents/criminals in direction_str are connected
                 self._all_suspects_in_vertical_set_with_verdict_are_connected(
-                    direction_suspects, verdict
+                    suspects_in_direction, verdict
                 )
 
             case [
@@ -3255,12 +3248,12 @@ class Puzzle:
 
                 direction = Direction(direction_str)
                 verdict = Verdict.parse(verdict_str)
-                direction_suspects = self._get_suspects_relative_to_other_suspect(
-                    suspect_name, direction
-                )
+                suspects_in_direction = self.suspects[
+                    suspect_name
+                ].suspects_in_direction(direction)
 
                 self._all_suspects_in_vertical_set_with_verdict_are_connected(
-                    direction_suspects, verdict
+                    suspects_in_direction, verdict
                 )
 
             case [

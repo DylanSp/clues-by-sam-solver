@@ -32,35 +32,25 @@ def complete_puzzle(url: str):
         profession_elements = page.locator("css=p.profession")
         professions = profession_elements.all_inner_texts()
 
-        suspects = [
-            RawSuspect(name, profession) for name, profession in zip(names, professions)
-        ]
+        suspects = [RawSuspect(name, profession) for name, profession in zip(names, professions)]
 
         # get initial suspect
         starting_suspect_card = page.locator("css=div.card.flipped").first
-        starting_suspect_name = starting_suspect_card.locator(
-            "css=h3.name"
-        ).inner_text()
+        starting_suspect_name = starting_suspect_card.locator("css=h3.name").inner_text()
 
         initial_clue = starting_suspect_card.locator("css=p.hint").inner_text()
 
         starting_suspect_card_classes = starting_suspect_card.get_attribute("class")
-        assert starting_suspect_card_classes is not None, (
-            "Initial suspect card does not have any CSS classes specified"
-        )
+        assert starting_suspect_card_classes is not None, "Initial suspect card does not have any CSS classes specified"
         starting_suspect_card_classes = starting_suspect_card_classes.split()
         if "innocent" in starting_suspect_card_classes:
             starting_suspect_verdict = Verdict.INNOCENT
         elif "criminal" in starting_suspect_card_classes:
             starting_suspect_verdict = Verdict.CRIMINAL
         else:
-            raise ValueError(
-                "Could not determine whether revealed suspect was innocent or criminal"
-            )
+            raise ValueError("Could not determine whether revealed suspect was innocent or criminal")
 
-        puzzle = Puzzle(
-            PuzzleInput(suspects, starting_suspect_name, starting_suspect_verdict)
-        )
+        puzzle = Puzzle(PuzzleInput(suspects, starting_suspect_name, starting_suspect_verdict))
 
         unhandled_clues: deque[Tuple[str, str]] = deque()
         unhandled_clues.append((initial_clue, starting_suspect_name))

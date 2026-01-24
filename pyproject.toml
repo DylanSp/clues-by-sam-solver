@@ -8,3 +8,6 @@ dependencies = [
     "playwright>=1.57.0",
     "z3-solver>=4.15.3.0",
 ]
+
+[tool.ruff]
+line-length = 120

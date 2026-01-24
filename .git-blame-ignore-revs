@@ -2,3 +2,5 @@
 77f64502c68aec1d466746aa7d81d3439caceaad
 # reorganized imports with Ruff
 4f33ee17aa71d2109bff5e830bbe9b236ff8c33d
+# extended max line length to 120, reformatted
+63341c3161fc827e915e9efd696bf99da6f98f85

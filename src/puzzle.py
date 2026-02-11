@@ -3187,6 +3187,46 @@ class Puzzle:
 
                 self._set_has_exactly_n_of_verdict(neighbors & suspects_between, 0, verdict)
 
+            # TODO - version for columns
+            case [
+                "Only",
+                "one",
+                "person",
+                "in",
+                "row",
+                row,
+                "has",
+                "exactly",
+                num_identified_neighbors,
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                # TODO - can we extract the logic of "only one person in row/column has <some predicate>" into a separate method?
+                # see methods like _suspect_has_most_neighbors_of_verdict()
+
+                row_suspects = self._row(int(row))
+
+                possible_constraints = []
+
+                for suspect in row_suspects:
+                    constraints_for_suspect = []
+
+                    constraints_for_suspect.append(
+                        count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
+                    )
+
+                    for other_suspect in row_suspects - set([suspect]):
+                        constraints_for_suspect.append(
+                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
+                            != int(num_identified_neighbors)
+                        )
+
+                    possible_constraints.append(And(*constraints_for_suspect))
+
+                self.solver.add(Or(*possible_constraints))
+
             case _:
                 print(f"Unrecognized clue type: {clue}")
 

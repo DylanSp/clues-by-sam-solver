@@ -597,6 +597,23 @@ class Puzzle:
                 "number",
                 "of",
                 ("innocents" | "criminals") as verdict_str,
+                "on",
+                "the",
+                "edges",
+            ]:
+                parity = Parity(parity_str)
+                verdict = Verdict.parse(verdict_str)
+                edge_suspects = self._edges()
+
+                self._set_has_parity(edge_suspects, parity, verdict)
+
+            case [
+                "There's",
+                "an",
+                ("odd" | "even") as parity_str,
+                "number",
+                "of",
+                ("innocents" | "criminals") as verdict_str,
                 "in",
                 "a",
                 "corner",
@@ -3328,7 +3345,109 @@ class Puzzle:
                             count_suspects_with_verdict(other_suspect.neighbors, verdict)
                             != int(num_identified_neighbors)
                         )
+                    possible_constraints.append(And(*constraints_for_suspect))
 
+                self.solver.add(Or(*possible_constraints))
+
+            case [
+                "Only",
+                "one",
+                "person",
+                "in",
+                "a",
+                "corner",
+                "has",
+                "exactly",
+                num_identified_neighbors,
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                corner_suspects = self._corners()
+
+                possible_constraints = []
+
+                for suspect in corner_suspects:
+                    constraints_for_suspect = []
+
+                    constraints_for_suspect.append(
+                        count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
+                    )
+
+                    for other_suspect in corner_suspects - set([suspect]):
+                        constraints_for_suspect.append(
+                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
+                            != int(num_identified_neighbors)
+                        )
+                    possible_constraints.append(And(*constraints_for_suspect))
+
+                self.solver.add(Or(*possible_constraints))
+
+            case [
+                "Only",
+                "one",
+                profession,
+                "has",
+                "exactly",
+                num_identified_neighbors,
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                profession_members = self._all_of_profession(profession)
+
+                possible_constraints = []
+
+                for suspect in profession_members:
+                    constraints_for_suspect = []
+
+                    constraints_for_suspect.append(
+                        count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
+                    )
+
+                    for other_suspect in profession_members - set([suspect]):
+                        constraints_for_suspect.append(
+                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
+                            != int(num_identified_neighbors)
+                        )
+                    possible_constraints.append(And(*constraints_for_suspect))
+
+                self.solver.add(Or(*possible_constraints))
+
+            case [
+                "Only",
+                "one",
+                "of",
+                "us",
+                _num_profession,
+                profession_plural,
+                "has",
+                "exactly",
+                num_identified_neighbors,
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+                profession = profession_plural.removesuffix("s")
+
+                profession_members = self._all_of_profession(profession)
+
+                possible_constraints = []
+
+                for suspect in profession_members:
+                    constraints_for_suspect = []
+
+                    constraints_for_suspect.append(
+                        count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
+                    )
+
+                    for other_suspect in profession_members - set([suspect]):
+                        constraints_for_suspect.append(
+                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
+                            != int(num_identified_neighbors)
+                        )
                     possible_constraints.append(And(*constraints_for_suspect))
 
                 self.solver.add(Or(*possible_constraints))
@@ -3368,10 +3487,15 @@ class Puzzle:
                 "row",
                 "has",
                 "exactly",
-                num_suspects,
-                ("innocents" | "criminals") as verdict_str,
+                num_suspects_str,
+                ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
+
+                try:
+                    num_suspects = int(num_suspects_str)
+                except ValueError:
+                    num_suspects = word_to_int[num_suspects_str]
 
                 possible_constraints = []
 

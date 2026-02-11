@@ -2705,6 +2705,23 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(suspects_between, 1, verdict)
 
             case [
+                "There",
+                "are",
+                "exactly",
+                num_suspects,
+                ("innocents" | "criminals") as verdict_str,
+                "in",
+                "between",
+                suspect1_name,
+                "and",
+                suspect2_name,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+                suspects_between = self._between_suspects(suspect1_name, suspect2_name)
+
+                self._set_has_exactly_n_of_verdict(suspects_between, int(num_suspects), verdict)
+
+            case [
                 "The",
                 "only",
                 ("innocent" | "criminal") as verdict_str,

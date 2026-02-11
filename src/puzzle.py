@@ -382,15 +382,14 @@ class Puzzle:
 
     def _add_constraints_from_clue(self, clue: str, suspect_with_clue: str = ""):
         match clue.split():
-            # TODO - does this need to have "is" | "are"? (if it does, probably add "innocents" | "criminals" to verdict_str)
             case [
                 "Exactly",
                 num_suspects,
-                ("innocent" | "criminal") as verdict_str,
+                ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
                 "in",
                 "column",
                 column,
-                "is",
+                "is" | "are",
                 "neighboring",
                 suspect_name,
             ]:
@@ -406,11 +405,11 @@ class Puzzle:
             case [
                 "Exactly",
                 num_suspects,
-                ("innocent" | "criminal") as verdict_str,
+                ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
                 "in",
                 "row",
                 row,
-                "is",
+                "is" | "are",
                 "neighboring",
                 suspect_name,
             ]:
@@ -1287,6 +1286,9 @@ class Puzzle:
                 if identified_suspect_name == "I":
                     identified_suspect_name = suspect_with_clue
 
+                if central_suspect_name == "me":
+                    central_suspect_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
                 direction = Direction(direction_str)
 
@@ -1803,6 +1805,9 @@ class Puzzle:
                 if other_suspect_name == "me":
                     other_suspect_name = suspect_with_clue
 
+                if central_suspect_name == "me":
+                    central_suspect_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
                 direction = Direction(direction_str)
                 central_suspect_neighbors = self.suspects[central_suspect_name].neighbors
@@ -1950,6 +1955,35 @@ class Puzzle:
                 neighbors = self.suspects[suspect_name].neighbors
 
                 self._set_has_exactly_n_of_verdict(edge_suspects & neighbors, int(num_edges_subset), verdict)
+
+            # TODO - version intersecting edges and rows?
+            # TODO - different wording if num_edges_subset > 1? Add `| "are"` to "is"?
+            case [
+                "Only",
+                num_edges_subset,
+                "of",
+                "the",
+                num_edges,
+                ("innocents" | "criminals") as verdict_str,
+                "on",
+                "the",
+                "edges",
+                "is",
+                "in",
+                "column",
+                column,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                edge_suspects = self._edges()
+
+                # first part - edges have num_edges suspects with verdict
+                self._set_has_exactly_n_of_verdict(edge_suspects, int(num_edges), verdict)
+
+                # second part - intersection of edges and column has num_edges_subset with verdict
+                column_suspects = self._column(Column(column))
+
+                self._set_has_exactly_n_of_verdict(edge_suspects & column_suspects, int(num_edges_subset), verdict)
 
             case [
                 "Exactly",
@@ -2980,6 +3014,23 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(set(self.suspects.values()), int(num_suspects), verdict)
 
             case [
+                "There",
+                "are",
+                "at",
+                "least",
+                num_suspects,
+                ("innocents" | "criminals") as verdict_str,
+                "on",
+                "the",
+                "edges",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                edge_suspects_count = count_suspects_with_verdict(self._edges(), verdict)
+
+                self.solver.add(edge_suspects_count >= int(num_suspects))
+
+            case [
                 suspect1_name,
                 "and",
                 suspect2_name,
@@ -3112,6 +3163,26 @@ class Puzzle:
 
             # TODO - version for columns
             case [
+                "There",
+                "are",
+                "no",
+                ("innocents" | "criminals") as verdict_str,
+                "in",
+                "row",
+                row,
+                "who",
+                "neighbor",
+                suspect_name,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                neighbors = self.suspects[suspect_name].neighbors
+                row_suspects = self._row(int(row))
+
+                self._set_has_exactly_n_of_verdict(neighbors & row_suspects, 0, verdict)
+
+            # TODO - version for columns
+            case [
                 num_suspects,
                 "of",
                 suspect_name,
@@ -3187,7 +3258,45 @@ class Puzzle:
 
                 self._set_has_exactly_n_of_verdict(neighbors & suspects_between, 0, verdict)
 
-            # TODO - version for columns
+            # TODO - can we extract the logic of "only one person in row/column has <some predicate>" into a separate method?
+            # see methods like _suspect_has_most_neighbors_of_verdict()
+            case [
+                "Only",
+                "one",
+                "person",
+                "in",
+                "column",
+                column,
+                "has",
+                "exactly",
+                num_identified_neighbors,
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                column_suspects = self._column(Column(column))
+
+                possible_constraints = []
+
+                for suspect in column_suspects:
+                    constraints_for_suspect = []
+
+                    constraints_for_suspect.append(
+                        count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
+                    )
+
+                    for other_suspect in column_suspects - set([suspect]):
+                        constraints_for_suspect.append(
+                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
+                            != int(num_identified_neighbors)
+                        )
+                    possible_constraints.append(And(*constraints_for_suspect))
+
+                self.solver.add(Or(*possible_constraints))
+
+            # TODO - can we extract the logic of "only one person in row/column has <some predicate>" into a separate method?
+            # see methods like _suspect_has_most_neighbors_of_verdict()
             case [
                 "Only",
                 "one",
@@ -3202,9 +3311,6 @@ class Puzzle:
                 "neighbors",
             ]:
                 verdict = Verdict.parse(verdict_str)
-
-                # TODO - can we extract the logic of "only one person in row/column has <some predicate>" into a separate method?
-                # see methods like _suspect_has_most_neighbors_of_verdict()
 
                 row_suspects = self._row(int(row))
 
@@ -3226,6 +3332,129 @@ class Puzzle:
                     possible_constraints.append(And(*constraints_for_suspect))
 
                 self.solver.add(Or(*possible_constraints))
+
+            case [
+                "Only",
+                "one",
+                "column",
+                "has",
+                "exactly",
+                num_suspects,
+                ("innocents" | "criminals") as verdict_str,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                possible_constraints = []
+
+                for column in Column:
+                    constraints_for_column = []
+
+                    constraints_for_column.append(
+                        count_suspects_with_verdict(self._column(column), verdict) == int(num_suspects)
+                    )
+
+                    for other_column in Column:
+                        if other_column != column:
+                            constraints_for_column.append(
+                                count_suspects_with_verdict(self._column(other_column), verdict) != int(num_suspects)
+                            )
+                    possible_constraints.append(And(*constraints_for_column))
+
+                self.solver.add(Or(*possible_constraints))
+
+            case [
+                "Only",
+                "one",
+                "row",
+                "has",
+                "exactly",
+                num_suspects,
+                ("innocents" | "criminals") as verdict_str,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                possible_constraints = []
+
+                for row in range(1, 6):
+                    constraints_for_row = []
+
+                    constraints_for_row.append(
+                        count_suspects_with_verdict(self._row(row), verdict) == int(num_suspects)
+                    )
+
+                    for other_row in range(1, 6):
+                        if other_row != row:
+                            constraints_for_row.append(
+                                count_suspects_with_verdict(self._row(other_row), verdict) != int(num_suspects)
+                            )
+                    possible_constraints.append(And(*constraints_for_row))
+
+                self.solver.add(Or(*possible_constraints))
+
+            # TODO - extract logic for "row/column is the only row/column with exactly num_suspects"?
+            case [
+                "Column",
+                column,
+                "is",
+                "the",
+                "only",
+                "column",
+                "with",
+                "exactly",
+                num_suspects,
+                ("innocents" | "criminals") as verdict_str,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+                column = Column(column)
+
+                # first part - column has exactly num_suspects of verdict
+                self._set_has_exactly_n_of_verdict(self._column(column), int(num_suspects), verdict)
+
+                # second part - other columns do *not* have exactly num_suspects of verdict
+                for other_column in Column:
+                    if other_column != column:
+                        other_column_count = count_suspects_with_verdict(self._column(other_column), verdict)
+                        self.solver.add(other_column_count != int(num_suspects))
+
+            case [
+                "Row",
+                row,
+                "is",
+                "the",
+                "only",
+                "row",
+                "with",
+                "exactly",
+                num_suspects,
+                ("innocents" | "criminals") as verdict_str,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                # first part - row has exactly num_suspects of verdict
+                self._set_has_exactly_n_of_verdict(self._row(int(row)), int(num_suspects), verdict)
+
+                # second part - other rows do *not* have exactly num_suspects of verdict
+                for other_row in range(1, 6):
+                    if other_row != int(row):
+                        other_row_count = count_suspects_with_verdict(self._row(other_row), verdict)
+                        self.solver.add(other_row_count != int(num_suspects))
+
+            # TODO - version for rows
+            # TODO - extract logic into method?
+            case [
+                "Each",
+                "column",
+                "has",
+                "at",
+                "least",
+                num_verdict,
+                ("innocents" | "criminals") as verdict_str,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                for column in Column:
+                    column_count = count_suspects_with_verdict(self._column(column), verdict)
+                    self.solver.add(column_count >= int(num_verdict))
 
             case _:
                 print(f"Unrecognized clue type: {clue}")

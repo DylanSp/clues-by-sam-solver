@@ -3099,6 +3099,23 @@ class Puzzle:
             case [
                 suspect_name,
                 "has",
+                "only",
+                "one",
+                ("innocent" | "criminal") as verdict_str,
+                "neighbor",
+                "on",
+                "the",
+                "edges",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+                neighbors = self.suspects[suspect_name].neighbors
+                edge_suspects = self._edges()
+
+                self._set_has_exactly_n_of_verdict(neighbors & edge_suspects, 1, verdict)
+
+            case [
+                suspect_name,
+                "has",
                 num_suspects,
                 ("innocent" | "criminal") as verdict_str,
                 "neighbors",
@@ -3174,9 +3191,27 @@ class Puzzle:
                 profession,
             ]:
                 verdict = Verdict.parse(verdict_str)
+
                 suspects = self._edges() & self._all_of_profession(profession)
 
                 self._set_has_exactly_n_of_verdict(suspects, int(num_suspects), verdict)
+
+            # TODO - version for columns
+            case [
+                "Exactly",
+                num_suspects,
+                ("innocent" | "criminal") as verdict_str,
+                "on",
+                "the",
+                "edges",
+                "is",
+                "in",
+                "row",
+                row,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                self._set_has_exactly_n_of_verdict(self._edges() & self._row(int(row)), int(num_suspects), verdict)
 
             # TODO - version for columns
             case [
@@ -3211,6 +3246,10 @@ class Puzzle:
                 row,
             ]:
                 verdict = Verdict.parse(verdict_str)
+
+                if suspect_name == "my":
+                    suspect_name = suspect_with_clue
+
                 # original suspect_name ends with 's
                 suspect_name = suspect_name.removesuffix("'s")
 
@@ -3563,7 +3602,6 @@ class Puzzle:
                         other_row_count = count_suspects_with_verdict(self._row(other_row), verdict)
                         self.solver.add(other_row_count != int(num_suspects))
 
-            # TODO - version for rows
             # TODO - extract logic into method?
             case [
                 "Each",
@@ -3571,14 +3609,61 @@ class Puzzle:
                 "has",
                 "at",
                 "least",
-                num_verdict,
-                ("innocents" | "criminals") as verdict_str,
+                num_suspects_str,
+                ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
 
+                try:
+                    num_suspects = int(num_suspects_str)
+                except ValueError:
+                    num_suspects = word_to_int[num_suspects_str]
+
                 for column in Column:
                     column_count = count_suspects_with_verdict(self._column(column), verdict)
-                    self.solver.add(column_count >= int(num_verdict))
+                    self.solver.add(column_count >= num_suspects)
+
+            case [
+                "Each",
+                "row",
+                "has",
+                "at",
+                "least",
+                num_suspects_str,
+                ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                try:
+                    num_suspects = int(num_suspects_str)
+                except ValueError:
+                    num_suspects = word_to_int[num_suspects_str]
+
+                for row in range(1, 6):
+                    row_count = count_suspects_with_verdict(self._row(row), verdict)
+                    self.solver.add(row_count >= num_suspects)
+
+            # TODO - different wording if num_suspects > 1?
+            case [
+                "Everyone",
+                "has",
+                "at",
+                "least",
+                num_suspects_str,
+                ("innocent" | "criminal") as verdict_str,
+                ("neighbor" | "neighbors"),
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                try:
+                    num_suspects = int(num_suspects_str)
+                except ValueError:
+                    num_suspects = word_to_int[num_suspects_str]
+
+                for suspect in self.suspects.values():
+                    neighbor_count = count_suspects_with_verdict(suspect.neighbors, verdict)
+
+                    self.solver.add(neighbor_count >= num_suspects)
 
             case _:
                 print(f"Unrecognized clue type: {clue}")

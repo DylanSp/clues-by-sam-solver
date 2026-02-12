@@ -15,6 +15,13 @@ word_to_int: dict[str, int] = {
 }
 
 
+def parse_number_str(input: str) -> int:
+    try:
+        return int(input)
+    except ValueError:
+        return word_to_int[input]
+
+
 # all the data on a suspect that the Puzzle engine needs, including location, neighbors, and a Z3 BoolRef for tracking deduced verdict
 @dataclass
 class PuzzleSuspect:
@@ -3547,11 +3554,7 @@ class Puzzle:
                 ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
-
-                try:
-                    num_suspects = int(num_suspects_str)
-                except ValueError:
-                    num_suspects = word_to_int[num_suspects_str]
+                num_suspects = parse_number_str(num_suspects_str)
 
                 possible_constraints = []
 
@@ -3581,11 +3584,12 @@ class Puzzle:
                 "column",
                 "with",
                 "exactly",
-                num_suspects,
-                ("innocents" | "criminals") as verdict_str,
+                num_suspects_str,
+                ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
                 column = Column(column)
+                num_suspects = parse_number_str(num_suspects_str)
 
                 # first part - column has exactly num_suspects of verdict
                 self._set_has_exactly_n_of_verdict(self._column(column), int(num_suspects), verdict)
@@ -3605,10 +3609,11 @@ class Puzzle:
                 "row",
                 "with",
                 "exactly",
-                num_suspects,
-                ("innocents" | "criminals") as verdict_str,
+                num_suspects_str,
+                ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
+                num_suspects = parse_number_str(num_suspects_str)
 
                 # first part - row has exactly num_suspects of verdict
                 self._set_has_exactly_n_of_verdict(self._row(int(row)), int(num_suspects), verdict)
@@ -3630,11 +3635,7 @@ class Puzzle:
                 ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
-
-                try:
-                    num_suspects = int(num_suspects_str)
-                except ValueError:
-                    num_suspects = word_to_int[num_suspects_str]
+                num_suspects = parse_number_str(num_suspects_str)
 
                 for column in Column:
                     column_count = count_suspects_with_verdict(self._column(column), verdict)
@@ -3650,11 +3651,7 @@ class Puzzle:
                 ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
-
-                try:
-                    num_suspects = int(num_suspects_str)
-                except ValueError:
-                    num_suspects = word_to_int[num_suspects_str]
+                num_suspects = parse_number_str(num_suspects_str)
 
                 for row in range(1, 6):
                     row_count = count_suspects_with_verdict(self._row(row), verdict)

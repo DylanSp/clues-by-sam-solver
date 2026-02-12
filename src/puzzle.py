@@ -3669,15 +3669,22 @@ class Puzzle:
             ]:
                 verdict = Verdict.parse(verdict_str)
 
-                try:
-                    num_suspects = int(num_suspects_str)
-                except ValueError:
-                    num_suspects = word_to_int[num_suspects_str]
+                num_suspects = parse_number_str(num_suspects_str)
 
                 for suspect in self.suspects.values():
                     neighbor_count = count_suspects_with_verdict(suspect.neighbors, verdict)
 
                     self.solver.add(neighbor_count >= num_suspects)
+
+            case [
+                suspect_name,
+                "is",
+                "a" | "an",
+                ("innocent" | "criminal") as verdict_str,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                self._set_single_verdict(suspect_name, verdict)
 
             case _:
                 print(f"Unrecognized clue type: {clue}")

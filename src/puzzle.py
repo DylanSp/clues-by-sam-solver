@@ -100,6 +100,13 @@ class SuspectSolution:
     verdict: Verdict
 
 
+def count_suspects_with_verdict(suspects: set[PuzzleSuspect], verdict: Verdict):
+    if verdict == Verdict.INNOCENT:
+        return Sum([If(s.is_innocent, 1, 0) for s in suspects])
+    elif verdict == Verdict.CRIMINAL:
+        return Sum([If(s.is_innocent, 0, 1) for s in suspects])
+
+
 class Puzzle:
     suspects: dict[str, PuzzleSuspect]  # suspects by name
     solver: Solver
@@ -345,6 +352,24 @@ class Puzzle:
                         ),
                     )
                 )
+
+    # primary entrypoint
+
+    def add_clue(self, clue: str, suspect_with_clue: str) -> list[SuspectSolution]:
+        """
+        Add a new clue to the puzzle, including the source of the clue. Returns a list of newly deduced solutions.
+        """
+        new_solutions_found = []
+        self._add_constraints_from_clue(clue, suspect_with_clue)
+
+        while True:
+            match self._solve_one():
+                case None:
+                    break
+                case solution:
+                    new_solutions_found.append(solution)
+
+        return new_solutions_found
 
     # methods for solving puzzle
 
@@ -3688,28 +3713,3 @@ class Puzzle:
 
             case _:
                 print(f"Unrecognized clue type: {clue}")
-
-    # primary entrypoint
-
-    def add_clue(self, clue: str, suspect_with_clue: str) -> list[SuspectSolution]:
-        """
-        Add a new clue to the puzzle, including the source of the clue. Returns a list of newly deduced solutions.
-        """
-        new_solutions_found = []
-        self._add_constraints_from_clue(clue, suspect_with_clue)
-
-        while True:
-            match self._solve_one():
-                case None:
-                    break
-                case solution:
-                    new_solutions_found.append(solution)
-
-        return new_solutions_found
-
-
-def count_suspects_with_verdict(suspects: set[PuzzleSuspect], verdict: Verdict):
-    if verdict == Verdict.INNOCENT:
-        return Sum([If(s.is_innocent, 1, 0) for s in suspects])
-    elif verdict == Verdict.CRIMINAL:
-        return Sum([If(s.is_innocent, 0, 1) for s in suspects])

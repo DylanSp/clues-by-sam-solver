@@ -3602,6 +3602,42 @@ class Puzzle:
                         neighbor_count = count_suspects_with_verdict(other_suspect.neighbors, verdict)
                         self.solver.add(neighbor_count != int(num_neighbors))
 
+            # TODO - extract logic for "No one in <set> matches <criteria>"?
+            case [
+                "No",
+                "one",
+                ("above" | "below") as direction_str,
+                suspect_name,
+                "has",
+                "more",
+                "than",
+                num_neighbors,
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ] | [
+                "No",
+                "one",
+                "to",
+                "the",
+                ("left" | "right") as direction_str,
+                "of",
+                suspect_name,
+                "has",
+                "more",
+                "than",
+                num_neighbors,
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
+
+                suspects_in_direction = self.suspects[suspect_name].suspects_to(direction)
+
+                for suspect in suspects_in_direction:
+                    neighbor_count = count_suspects_with_verdict(suspect.neighbors, verdict)
+                    self.solver.add(Not(neighbor_count > int(num_neighbors)))
+
             # TODO - extract logic for "row/column is the only row/column with exactly num_suspects"?
             case [
                 "Column",

@@ -539,6 +539,11 @@ class Puzzle:
                 "neighbor",
                 suspect2_name,
             ]:
+                if suspect1_name == "me":
+                    suspect1_name = suspect_with_clue
+
+                # TODO - can suspect2_name be "me"?
+
                 direction = Direction(direction_str)
                 verdict = Verdict.parse(verdict_str)
 
@@ -691,8 +696,8 @@ class Puzzle:
                 "of",
                 ("innocents" | "criminals") as verdict_str,
                 "in",
-                "a",
-                "corner",
+                "a" | "the",
+                "corner" | "corners",
             ]:
                 parity = Parity(parity_str)
                 verdict = Verdict.parse(verdict_str)
@@ -2054,8 +2059,9 @@ class Puzzle:
                 suspect_name,
                 "neighbor" | "neighbors",
             ]:
-                # original suspect_name ends with 's, e.g. "Ollie's"
+                # original suspect_name ends with 's, e.g. "Ollie's", or ', e.g. "Gus'"
                 suspect_name = suspect_name.removesuffix("'s")
+                suspect_name = suspect_name.removesuffix("'")
                 verdict = Verdict.parse(verdict_str)
                 edge_suspects = self._edges()
 
@@ -2369,12 +2375,15 @@ class Puzzle:
 
             case [
                 suspect_name,
-                "has",
+                "has" | "have",
                 "the",
                 "most",
                 ("innocent" | "criminal") as verdict_str,
                 "neighbors",
             ]:
+                if suspect_name == "I":
+                    suspect_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
 
                 self._suspect_has_most_neighbors_of_verdict(suspect_name, verdict)
@@ -2994,6 +3003,7 @@ class Puzzle:
                 neighbors = self.suspects[suspect_name].neighbors
                 self._set_has_exactly_n_of_verdict(row_suspects & neighbors, int(num_neighbors), verdict)
 
+            # TODO - version intersecting row and edges?
             case [
                 "Only",
                 num_column_subset,
@@ -3020,6 +3030,34 @@ class Puzzle:
                 edge_suspects = self._edges()
 
                 self._set_has_exactly_n_of_verdict(column_suspects & edge_suspects, int(num_column_subset), verdict)
+
+            # TODO - version intersecting column and corners?
+            case [
+                "Only",
+                num_row_subset,
+                "of",
+                "the",
+                num_row,
+                ("innocents" | "criminals") as verdict_str,
+                "in",
+                "row",
+                row,
+                "is" | "are",
+                "in",
+                "a",
+                "corner",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                # first part - there are num_row innocents/criminals in row
+                row_suspects = self._row(int(row))
+
+                self._set_has_exactly_n_of_verdict(row_suspects, int(num_row), verdict)
+
+                # second part - there are num_row_subset innocents/criminals in intersection of row and corners
+                corner_suspects = self._corners()
+
+                self._set_has_exactly_n_of_verdict(row_suspects & corner_suspects, int(num_row_subset), verdict)
 
             case [
                 "Only",
@@ -3919,6 +3957,13 @@ class Puzzle:
                 verdict = Verdict.parse(verdict_str)
 
                 self._set_single_verdict(suspect_name, verdict)
+
+            # TODO - version for 0?
+            # TODO - version for >1?
+            case ["There", "is", "only", "one", ("innocent" | "criminal") as verdict_str, profession]:
+                verdict = Verdict.parse(verdict_str)
+
+                self._set_has_exactly_n_of_verdict(self._all_of_profession(profession), 1, verdict)
 
             case _:
                 print(f"Unrecognized clue type: {clue}")

@@ -1049,6 +1049,9 @@ class Puzzle:
                 "of",
                 suspect_name,
             ]:
+                if suspect_name == "me":
+                    suspect_name = suspect_with_clue
+
                 direction = Direction(direction_str)
                 verdict = Verdict.parse(verdict_str)
                 suspects_in_direction = self.suspects[suspect_name].suspects_to(direction)
@@ -3411,11 +3414,12 @@ class Puzzle:
                 row,
                 "has",
                 "exactly",
-                num_identified_neighbors,
+                num_identified_neighbors_str,
                 ("innocent" | "criminal") as verdict_str,
-                "neighbors",
+                "neighbor" | "neighbors",
             ]:
                 verdict = Verdict.parse(verdict_str)
+                num_identified_neighbors = parse_number_str(num_identified_neighbors_str)
 
                 row_suspects = self._row(int(row))
 
@@ -3496,16 +3500,35 @@ class Puzzle:
                     ),
                 )
 
+            # TODO - version for >1 neighbors?
+            case [
+                "Only",
+                "one",
+                "person",
+                "has",
+                "only",
+                "one",
+                ("innocent" | "criminal") as verdict_str,
+                "neighbor",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                self._only_one_of_set_matches_criteria(
+                    set(self.suspects.values()),
+                    lambda suspect: count_suspects_with_verdict(suspect.neighbors, verdict) == 1,
+                )
+
             case [
                 "Only",
                 "one",
                 "column",
                 "has",
                 "exactly",
-                num_suspects,
-                ("innocents" | "criminals") as verdict_str,
+                num_suspects_str,
+                ("innocent" | "criminal" | "innocents" | "criminals") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
+                num_suspects = parse_number_str(num_suspects_str)
 
                 possible_constraints = []
 
@@ -3554,6 +3577,30 @@ class Puzzle:
                     possible_constraints.append(And(*constraints_for_row))
 
                 self.solver.add(Or(*possible_constraints))
+
+            # TODO - extract logic for "given suspect is the only one matching <criteria>"?
+            case [
+                suspect_name,
+                "is",
+                "the",
+                "only",
+                "one",
+                "with",
+                "exactly",
+                num_neighbors,
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                # first part - suspect_name has exactly num_neighbors with verdict
+                self._set_has_exactly_n_of_verdict(self.suspects[suspect_name].neighbors, int(num_neighbors), verdict)
+
+                # second part - all other suspects do *not* have exactly num_neighbors with verdict
+                for other_suspect in self.suspects.values():
+                    if other_suspect.name != suspect_name:
+                        neighbor_count = count_suspects_with_verdict(other_suspect.neighbors, verdict)
+                        self.solver.add(neighbor_count != int(num_neighbors))
 
             # TODO - extract logic for "row/column is the only row/column with exactly num_suspects"?
             case [

@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Optional, Set
+from typing import Any, Optional, Set
 
 from z3 import And, Bool, BoolRef, If, Not, Or, Solver, Sum, sat, unsat
 
@@ -352,6 +353,20 @@ class Puzzle:
                         ),
                     )
                 )
+
+    # criteria callback is typed as returning Any because z3 doesn't export Unknown/Probe types (z3.Or returns Unknown | Probe | BoolRef)
+    def _only_one_of_set_matches_criteria(self, suspects: set[PuzzleSuspect], criteria: Callable[[PuzzleSuspect], Any]):
+        possible_constraints = []
+
+        for suspect in suspects:
+            constraints_for_suspect = []
+            constraints_for_suspect.append(criteria(suspect))
+
+            for other_suspect in suspects - set([suspect]):
+                constraints_for_suspect.append(Not(criteria(other_suspect)))
+            possible_constraints.append(And(*constraints_for_suspect))
+
+        self.solver.add(Or(*possible_constraints))
 
     # primary entrypoint
 
@@ -3363,8 +3378,6 @@ class Puzzle:
 
                 self._set_has_exactly_n_of_verdict(neighbors & suspects_between, 0, verdict)
 
-            # TODO - can we extract the logic of "only one person in row/column has <some predicate>" into a separate method?
-            # see methods like _suspect_has_most_neighbors_of_verdict()
             case [
                 "Only",
                 "one",
@@ -3382,26 +3395,13 @@ class Puzzle:
 
                 column_suspects = self._column(Column(column))
 
-                possible_constraints = []
-
-                for suspect in column_suspects:
-                    constraints_for_suspect = []
-
-                    constraints_for_suspect.append(
+                self._only_one_of_set_matches_criteria(
+                    column_suspects,
+                    lambda suspect: (
                         count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
-                    )
+                    ),
+                )
 
-                    for other_suspect in column_suspects - set([suspect]):
-                        constraints_for_suspect.append(
-                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
-                            != int(num_identified_neighbors)
-                        )
-                    possible_constraints.append(And(*constraints_for_suspect))
-
-                self.solver.add(Or(*possible_constraints))
-
-            # TODO - can we extract the logic of "only one person in row/column has <some predicate>" into a separate method?
-            # see methods like _suspect_has_most_neighbors_of_verdict()
             case [
                 "Only",
                 "one",
@@ -3419,23 +3419,12 @@ class Puzzle:
 
                 row_suspects = self._row(int(row))
 
-                possible_constraints = []
-
-                for suspect in row_suspects:
-                    constraints_for_suspect = []
-
-                    constraints_for_suspect.append(
+                self._only_one_of_set_matches_criteria(
+                    row_suspects,
+                    lambda suspect: (
                         count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
-                    )
-
-                    for other_suspect in row_suspects - set([suspect]):
-                        constraints_for_suspect.append(
-                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
-                            != int(num_identified_neighbors)
-                        )
-                    possible_constraints.append(And(*constraints_for_suspect))
-
-                self.solver.add(Or(*possible_constraints))
+                    ),
+                )
 
             case [
                 "Only",
@@ -3454,23 +3443,12 @@ class Puzzle:
 
                 corner_suspects = self._corners()
 
-                possible_constraints = []
-
-                for suspect in corner_suspects:
-                    constraints_for_suspect = []
-
-                    constraints_for_suspect.append(
+                self._only_one_of_set_matches_criteria(
+                    corner_suspects,
+                    lambda suspect: (
                         count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
-                    )
-
-                    for other_suspect in corner_suspects - set([suspect]):
-                        constraints_for_suspect.append(
-                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
-                            != int(num_identified_neighbors)
-                        )
-                    possible_constraints.append(And(*constraints_for_suspect))
-
-                self.solver.add(Or(*possible_constraints))
+                    ),
+                )
 
             case [
                 "Only",
@@ -3486,23 +3464,12 @@ class Puzzle:
 
                 profession_members = self._all_of_profession(profession)
 
-                possible_constraints = []
-
-                for suspect in profession_members:
-                    constraints_for_suspect = []
-
-                    constraints_for_suspect.append(
+                self._only_one_of_set_matches_criteria(
+                    profession_members,
+                    lambda suspect: (
                         count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
-                    )
-
-                    for other_suspect in profession_members - set([suspect]):
-                        constraints_for_suspect.append(
-                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
-                            != int(num_identified_neighbors)
-                        )
-                    possible_constraints.append(And(*constraints_for_suspect))
-
-                self.solver.add(Or(*possible_constraints))
+                    ),
+                )
 
             case [
                 "Only",
@@ -3522,23 +3489,12 @@ class Puzzle:
 
                 profession_members = self._all_of_profession(profession)
 
-                possible_constraints = []
-
-                for suspect in profession_members:
-                    constraints_for_suspect = []
-
-                    constraints_for_suspect.append(
+                self._only_one_of_set_matches_criteria(
+                    profession_members,
+                    lambda suspect: (
                         count_suspects_with_verdict(suspect.neighbors, verdict) == int(num_identified_neighbors)
-                    )
-
-                    for other_suspect in profession_members - set([suspect]):
-                        constraints_for_suspect.append(
-                            count_suspects_with_verdict(other_suspect.neighbors, verdict)
-                            != int(num_identified_neighbors)
-                        )
-                    possible_constraints.append(And(*constraints_for_suspect))
-
-                self.solver.add(Or(*possible_constraints))
+                    ),
+                )
 
             case [
                 "Only",
@@ -3649,7 +3605,7 @@ class Puzzle:
                         other_row_count = count_suspects_with_verdict(self._row(other_row), verdict)
                         self.solver.add(other_row_count != int(num_suspects))
 
-            # TODO - extract logic into method?
+            # TODO - extract logic for "Each column/row meets <criteria>" into method?
             case [
                 "Each",
                 "column",

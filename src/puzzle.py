@@ -10,6 +10,7 @@ NUM_ROWS = 5
 NUM_COLS = 4
 
 word_to_int: dict[str, int] = {
+    "No": 0,
     "one": 1,
     "two": 2,
     "three": 3,
@@ -477,6 +478,15 @@ class Puzzle:
                 "neighboring",
                 suspect_name,
                 "is",
+                profession,
+            ] | [
+                "Exactly",
+                num_suspects,
+                ("innocent" | "criminal") as verdict_str,
+                "neighboring",
+                suspect_name,
+                "is",
+                "a",
                 profession,
             ]:
                 verdict = Verdict.parse(verdict_str)
@@ -1588,18 +1598,18 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(set(filtered_neighbors), 1, verdict)
 
             case [
-                num_of_profession,
+                num_of_profession_str,
                 profession_plural,
-                "have",
+                "has" | "have",
                 "a" | "an",
                 ("innocent" | "criminal") as verdict_str,
                 "directly",
                 ("above" | "below") as direction_str,
                 "them",
             ] | [
-                num_of_profession,
+                num_of_profession_str,
                 profession_plural,
-                "have",
+                "has" | "have",
                 "a" | "an",
                 ("innocent" | "criminal") as verdict_str,
                 "directly",
@@ -1610,13 +1620,14 @@ class Puzzle:
                 "them",
             ]:
                 verdict = Verdict.parse(verdict_str)
-                profession = profession_plural.removesuffix("s")
-                profession_members = self._all_of_profession(profession)
                 direction = Direction(direction_str)
-                profession_neighbors = [p.neighbor_to(direction) for p in profession_members]
+                num_of_profession = parse_number_str(num_of_profession_str)
+                profession = profession_plural.removesuffix("s")
+
+                profession_neighbors = [p.neighbor_to(direction) for p in self._all_of_profession(profession)]
                 filtered_neighbors = [n for n in profession_neighbors if n is not None]
 
-                self._set_has_exactly_n_of_verdict(set(filtered_neighbors), int(num_of_profession), verdict)
+                self._set_has_exactly_n_of_verdict(set(filtered_neighbors), num_of_profession, verdict)
 
             case [
                 num_of_profession,
@@ -1656,7 +1667,6 @@ class Puzzle:
 
                 self._set_has_exactly_n_of_verdict(set(filtered_neighbors), int(num_of_profession), verdict)
 
-            # TODO - version for "to the left of/to the right of"
             case [
                 "Exactly",
                 num_neighbor_subset,
@@ -1668,6 +1678,21 @@ class Puzzle:
                 central_suspect_name,
                 "are",
                 ("above" | "below") as direction_str,
+                other_suspect_name,
+            ] | [
+                "Exactly",
+                num_neighbor_subset,
+                "of",
+                "the",
+                num_neighbors,
+                ("innocents" | "criminals") as verdict_str,
+                "neighboring",
+                central_suspect_name,
+                "are",
+                "to",
+                "the",
+                ("left" | "right") as direction_str,
+                "of",
                 other_suspect_name,
             ]:
                 verdict = Verdict.parse(verdict_str)
@@ -3250,7 +3275,7 @@ class Puzzle:
 
             case [
                 suspect_name,
-                "has",
+                "has" | "have",
                 num_suspects,
                 ("innocent" | "criminal") as verdict_str,
                 "neighbors",
@@ -3258,6 +3283,9 @@ class Puzzle:
                 "the",
                 "edges",
             ]:
+                if suspect_name == "I":
+                    suspect_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
                 neighbors = self.suspects[suspect_name].neighbors
                 edge_suspects = self._edges()

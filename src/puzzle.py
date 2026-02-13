@@ -541,6 +541,19 @@ class Puzzle:
                 "who",
                 "neighbor",
                 suspect2_name,
+            ] | [
+                "There",
+                "are",
+                "no",
+                ("innocents" | "criminals") as verdict_str,
+                "to",
+                "the",
+                ("left" | "right") as direction_str,
+                "of",
+                suspect1_name,
+                "who",
+                "neighbor",
+                suspect2_name,
             ]:
                 if suspect1_name == "me":
                     suspect1_name = suspect_with_clue
@@ -2159,6 +2172,31 @@ class Puzzle:
                 self._set_has_exactly_n_of_verdict(neighbors & row_suspects, int(num_neighbor_subset), verdict)
 
             case [
+                "Exactly",
+                num_neighbor_subset,
+                "of",
+                "the",
+                num_neighbors,
+                ("innocents" | "criminals") as verdict_str,
+                "neighboring",
+                suspect_name,
+                "are",
+                "on",
+                "the",
+                "edges",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+                neighbors = self.suspects[suspect_name].neighbors
+
+                # first part - suspect has num_neighbors with verdict
+                self._set_has_exactly_n_of_verdict(neighbors, int(num_neighbors), verdict)
+
+                # second part - intersection of suspect's neighbors and edges has num_neighbor_subset with verdict
+                edge_suspects = self._edges()
+
+                self._set_has_exactly_n_of_verdict(neighbors & edge_suspects, int(num_neighbor_subset), verdict)
+
+            case [
                 "Only",
                 num_neighbor_subset,
                 "of",
@@ -2226,6 +2264,9 @@ class Puzzle:
                 other_suspect_name,
                 "neighbor",
             ]:
+                if central_suspect_name == "me":
+                    central_suspect_name = suspect_with_clue
+
                 if other_suspect_name == "my":
                     other_suspect_name = suspect_with_clue
 
@@ -3117,6 +3158,33 @@ class Puzzle:
 
                 self._set_has_exactly_n_of_verdict(corner_suspects & column_suspects, int(num_corners_subset), verdict)
 
+            case [
+                "Only",
+                num_corners_subset,
+                "of",
+                "the",
+                num_corners,
+                ("innocents" | "criminals") as verdict_str,
+                "in",
+                "a" | "the",
+                "corner" | "corners",
+                "is" | "are",
+                "in",
+                "row",
+                row,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                # first part - there are num_corners innocents/criminals in corners
+                corner_suspects = self._corners()
+
+                self._set_has_exactly_n_of_verdict(corner_suspects, int(num_corners), verdict)
+
+                # second part - there are num_corners_subset innocents/criminals in intersection of corners and row
+                row_suspects = self._row(int(row))
+
+                self._set_has_exactly_n_of_verdict(corner_suspects & row_suspects, int(num_corners_subset), verdict)
+
             # TODO - version of this for "to the left/right"?
             case [
                 "Both",
@@ -3846,6 +3914,29 @@ class Puzzle:
                         neighbor_count = count_suspects_with_verdict(other_suspect.neighbors, verdict)
                         self.solver.add(neighbor_count != int(num_neighbors))
 
+            # TODO - extract logic for "given suspect is the only one matching <criteria>"?
+            case [
+                suspect_name,
+                "is",
+                "the",
+                "only",
+                "one",
+                "with",
+                "no",
+                ("innocent" | "criminal") as verdict_str,
+                "neighbors",
+            ]:
+                verdict = Verdict.parse(verdict_str)
+
+                # first part - suspect_name has exactly 0 neighbors with verdict
+                self._set_has_exactly_n_of_verdict(self.suspects[suspect_name].neighbors, 0, verdict)
+
+                # second part - all other suspects do *not* have exactly 0 neighbors with verdict
+                for other_suspect in self.suspects.values():
+                    if other_suspect.name != suspect_name:
+                        neighbor_count = count_suspects_with_verdict(other_suspect.neighbors, verdict)
+                        self.solver.add(neighbor_count != 0)
+
             # TODO - extract logic for "No one in <set> matches <criteria>"?
             case [
                 "No",
@@ -3949,6 +4040,7 @@ class Puzzle:
                         other_column_count = count_suspects_with_verdict(self._column(other_column), verdict)
                         self.solver.add(other_column_count != int(num_suspects))
 
+            # TODO - extract logic for "row/column is the only row/column with exactly num_suspects"?
             case [
                 "Row",
                 row,
@@ -3973,7 +4065,7 @@ class Puzzle:
                         other_row_count = count_suspects_with_verdict(self._row(other_row), verdict)
                         self.solver.add(other_row_count != int(num_suspects))
 
-            # TODO - extract logic for "Each column/row meets <criteria>" into method?
+            # TODO - extract logic for "Each column/row meets <criteria>"?
             case [
                 "Each",
                 "column",
@@ -3990,6 +4082,7 @@ class Puzzle:
                     column_count = count_suspects_with_verdict(self._column(column), verdict)
                     self.solver.add(column_count >= num_suspects)
 
+            # TODO - extract logic for "Each column/row meets <criteria>"?
             case [
                 "Each",
                 "row",

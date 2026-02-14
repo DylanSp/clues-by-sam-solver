@@ -1858,6 +1858,9 @@ class Puzzle:
                 "column",
                 column,
             ]:
+                if central_suspect_name == "me":
+                    central_suspect_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
                 central_suspect_neighbors = self.suspects[central_suspect_name].neighbors
 
@@ -2082,6 +2085,7 @@ class Puzzle:
                 suspect_name = suspect_name.removesuffix("'s")
                 suspect_name = suspect_name.removesuffix("'")
                 verdict = Verdict.parse(verdict_str)
+
                 edge_suspects = self._edges()
 
                 # first part - edges have num_edges suspects with verdict
@@ -2091,6 +2095,58 @@ class Puzzle:
                 neighbors = self.suspects[suspect_name].neighbors
 
                 self._set_has_exactly_n_of_verdict(edge_suspects & neighbors, int(num_edges_subset), verdict)
+
+            # TODO - check wording for "to the left/right of" case
+            case [
+                "Exactly",
+                num_direction_subset,
+                "of",
+                "the",
+                num_direction,
+                ("innocents" | "criminals") as verdict_str,
+                ("above" | "below") as direction_str,
+                root_suspect_name,
+                "are",
+                suspect_with_neighbors,
+                "neighbors",
+            ] | [
+                "Exactly",
+                num_direction_subset,
+                "of",
+                "the",
+                num_direction,
+                ("innocents" | "criminals") as verdict_str,
+                "to",
+                "the",
+                ("left" | "right") as direction_str,
+                "of",
+                root_suspect_name,
+                "are",
+                suspect_with_neighbors,
+                "neighbors",
+            ]:
+                if root_suspect_name == "me":
+                    root_suspect_name = suspect_with_clue
+
+                # original suspect_with_neighbors name ends with 's, e.g. "Ollie's", or ', e.g. "Gus'"
+                suspect_with_neighbors = suspect_with_neighbors.removesuffix("'s")
+                suspect_with_neighbors = suspect_with_neighbors.removesuffix("'")
+                verdict = Verdict.parse(verdict_str)
+                direction = Direction(direction_str)
+
+                # first part - num_direction suspects with verdict in direction from root_suspect
+                suspects_in_direction = self.suspects[root_suspect_name].suspects_to(direction)
+
+                self._set_has_exactly_n_of_verdict(suspects_in_direction, int(num_direction), verdict)
+
+                # second part - of those suspects, num_direction_subset are neighbors of suspect_with_neighbors
+                neighbor_suspects = self.suspects[suspect_with_neighbors].neighbors
+
+                self._set_has_exactly_n_of_verdict(
+                    suspects_in_direction & neighbor_suspects,
+                    int(num_direction_subset),
+                    verdict,
+                )
 
             # TODO - version intersecting edges and rows?
             # TODO - different wording if num_edges_subset > 1? Add `| "are"` to "is"?
@@ -2295,12 +2351,19 @@ class Puzzle:
                 "column",
                 column,
                 "are",
-                "my",
+                suspect_name,
                 "neighbors",
             ]:
+                if suspect_name == "my":
+                    suspect_name = suspect_with_clue
+
+                # suspect_name ends with 's or '
+                suspect_name = suspect_name.removesuffix("'s")
+                suspect_name = suspect_name.removesuffix("'")
+
                 parity = Parity(parity_str)
                 verdict = Verdict.parse(verdict_str)
-                neighbors = self.suspects[suspect_with_clue].neighbors
+                neighbors = self.suspects[suspect_name].neighbors
                 column_suspects = self._column(Column(column))
 
                 self._set_has_parity(neighbors & column_suspects, parity, verdict)
@@ -2642,7 +2705,24 @@ class Puzzle:
 
                 self.solver.add(innocent_count == criminal_count)
 
-            # TODO - version of this for columns
+            case [
+                "There",
+                "are",
+                "more",
+                ("innocents" | "criminals") as verdict_str,
+                "in",
+                "column",
+                more_column,
+                "than",
+                "column",
+                less_column,
+            ]:
+                verdict = Verdict.parse(verdict_str)
+                more_suspect_count = count_suspects_with_verdict(self._column(Column(more_column)), verdict)
+                less_suspect_count = count_suspects_with_verdict(self._column(Column(less_column)), verdict)
+
+                self.solver.add(more_suspect_count > less_suspect_count)
+
             case [
                 "There",
                 "are",
@@ -2892,6 +2972,11 @@ class Puzzle:
                 "and",
                 suspect2_name,
             ]:
+                # TODO - can suspect1_name be "me"?
+
+                if suspect2_name == "me":
+                    suspect2_name = suspect_with_clue
+
                 verdict = Verdict.parse(verdict_str)
                 suspects_between = self._between_suspects(suspect1_name, suspect2_name)
 
@@ -3426,6 +3511,10 @@ class Puzzle:
                 if suspect_name == "I":
                     suspect_name = suspect_with_clue
 
+                # in second form of clue, suspect_name ends with 's or '
+                suspect_name = suspect_name.removesuffix("'s")
+                suspect_name = suspect_name.removesuffix("'")
+
                 verdict = Verdict.parse(verdict_str)
                 neighbors = self.suspects[suspect_name].neighbors
                 edge_suspects = self._edges()
@@ -3565,14 +3654,25 @@ class Puzzle:
                 "in",
                 "row",
                 row,
+            ] | [
+                num_suspects,
+                "of",
+                suspect_name,
+                "neighbors",
+                "in",
+                "row",
+                row,
+                "are",
+                ("innocent" | "criminal") as verdict_str,
             ]:
                 verdict = Verdict.parse(verdict_str)
 
                 if suspect_name == "my":
                     suspect_name = suspect_with_clue
 
-                # original suspect_name ends with 's
+                # original suspect_name ends with 's or '
                 suspect_name = suspect_name.removesuffix("'s")
+                suspect_name = suspect_name.removesuffix("'")
 
                 neighbors = self.suspects[suspect_name].neighbors
                 row_suspects = self._row(int(row))

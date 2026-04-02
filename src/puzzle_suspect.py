@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Optional, Set
 
-from z3 import BoolRef
+from z3 import BoolRef, If, Sum
 
-from models import Column, Direction
+from models import Column, Direction, Verdict
 
 
 # all the data on a suspect that the Puzzle engine needs, including location, neighbors, and a Z3 BoolRef for tracking deduced verdict
@@ -76,3 +76,10 @@ class PuzzleSuspect:
     # Fast __repr__ method to allow debugging without needing to calculate repr for Z3 values
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} at {hex(id(self))}"
+
+
+def count_suspects_with_verdict(suspects: set[PuzzleSuspect], verdict: Verdict):
+    if verdict == Verdict.INNOCENT:
+        return Sum([If(s.is_innocent, 1, 0) for s in suspects])
+    elif verdict == Verdict.CRIMINAL:
+        return Sum([If(s.is_innocent, 0, 1) for s in suspects])
